@@ -8,9 +8,9 @@
     "shared"
   ],
   "scripts": {
-    "dev:website": "npm --workspace=apps/website run dev",
-    "dev:messaging": "npm --workspace=apps/messaging-app run dev",
-    "dev:management": "npm --workspace=apps/management-system run dev",
+    "dev:website": "npm --workspace=@apex/website run dev",
+    "dev:messaging": "npm --workspace=@apex/messaging-app run dev",
+    "dev:management": "npm --workspace=@apex/management-system run dev",
     "build": "npm run build --workspaces --if-present",
     "deploy:firebase": "firebase deploy"
   },
@@ -23,5 +23,16 @@
     "lms"
   ],
   "author": "Muhammad Rauf",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "canvas-confetti": "^1.9.4",
+    "firebase": "^12.10.0",
+    "lucide-react": "^1.16.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.4",
+    "vite": "^8.2.2"
+  }
 }
