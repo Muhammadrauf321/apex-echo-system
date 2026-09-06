@@ -1,0 +1,27 @@
+{
+  "name": "apex-echo-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Apex Education Forum Ecosystem: Website, Real-Time Messaging App, and Management System",
+  "workspaces": [
+    "apps/*",
+    "shared"
+  ],
+  "scripts": {
+    "dev:website": "npm --workspace=apps/website run dev",
+    "dev:messaging": "npm --workspace=apps/messaging-app run dev",
+    "dev:management": "npm --workspace=apps/management-system run dev",
+    "build": "npm run build --workspaces --if-present",
+    "deploy:firebase": "firebase deploy"
+  },
+  "keywords": [
+    "apex-education-forum",
+    "education",
+    "firebase",
+    "messaging",
+    "management-system",
+    "lms"
+  ],
+  "author": "Muhammad Rauf",
+  "license": "MIT"
+}

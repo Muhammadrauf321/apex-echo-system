@@ -1,0 +1,10 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // By default, authenticated users can read/write their relevant records
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
