@@ -12,8 +12,10 @@ import {
   SEED_COURSES, 
   SEED_BATCHES, 
   SEED_CERTIFICATES, 
-  DEMO_USERS 
+  DEMO_USERS,
+  SEED_EXAMS
 } from "./seedData.js";
+import { EXAM_STATUS } from "./constants.js";
 
 // In-memory / LocalStorage cache for immediate responsive feedback
 const STORAGE_KEYS = {
@@ -22,7 +24,8 @@ const STORAGE_KEYS = {
   INQUIRIES: "apex_inquiries",
   MESSAGES: "apex_messages",
   CERTIFICATES: "apex_certificates",
-  ATTENDANCE: "apex_attendance"
+  ATTENDANCE: "apex_attendance",
+  EXAMS: "apex_exams"
 };
 
 // Seed initial storage if not populated
@@ -35,6 +38,9 @@ function initLocalData() {
   }
   if (!localStorage.getItem(STORAGE_KEYS.CERTIFICATES)) {
     localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(SEED_CERTIFICATES));
+  }
+  if (!localStorage.getItem(STORAGE_KEYS.EXAMS)) {
+    localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify(SEED_EXAMS));
   }
   if (!localStorage.getItem(STORAGE_KEYS.INQUIRIES)) {
     localStorage.setItem(STORAGE_KEYS.INQUIRIES, JSON.stringify([
@@ -263,3 +269,99 @@ export function issueCertificate(certData) {
   window.dispatchEvent(new CustomEvent("apex_certificates_changed", { detail: certs }));
   return newCert;
 }
+
+// --- Examination Rotation Lifecycle Store ---
+
+export function getExams() {
+  const data = localStorage.getItem(STORAGE_KEYS.EXAMS);
+  if (!data) return SEED_EXAMS;
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return SEED_EXAMS;
+  }
+}
+
+export function saveExams(exams) {
+  localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify(exams));
+  window.dispatchEvent(new CustomEvent("apex_exams_changed", { detail: exams }));
+}
+
+export function getExamById(id) {
+  const exams = getExams();
+  return exams.find(e => e.id === id) || null;
+}
+
+// 1. Admin creates scheduled exam (Assigned to Teacher, Admin question access is LOCKED)
+export function createExam(examData) {
+  const exams = getExams();
+  const newExam = {
+    id: `exam_${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    status: EXAM_STATUS.PENDING_TEACHER,
+    adminFeedback: "",
+    submittedAt: null,
+    approvedAt: null,
+    questions: [],
+    ...examData
+  };
+  exams.unshift(newExam);
+  saveExams(exams);
+  return newExam;
+}
+
+// 2. Teacher updates / authors question draft (While in PENDING_TEACHER or REVISION)
+export function updateExamQuestions(examId, questions) {
+  const exams = getExams();
+  const index = exams.findIndex(e => e.id === examId);
+  if (index === -1) return null;
+
+  // Only allowed if not pending admin review or already approved
+  if (exams[index].status === EXAM_STATUS.PENDING_ADMIN || exams[index].status === EXAM_STATUS.APPROVED) {
+    throw new Error("Action not permitted: Exam questions are locked during admin review or after approval.");
+  }
+
+  exams[index].questions = questions;
+  saveExams(exams);
+  return exams[index];
+}
+
+// 3. Teacher Submits Paper to Admin (LOCKS TEACHER, UNLOCKS ADMIN REVIEW)
+export function submitExamPaper(examId) {
+  const exams = getExams();
+  const index = exams.findIndex(e => e.id === examId);
+  if (index === -1) return null;
+
+  exams[index].status = EXAM_STATUS.PENDING_ADMIN;
+  exams[index].submittedAt = new Date().toLocaleString();
+  saveExams(exams);
+  return exams[index];
+}
+
+// 4. Admin Approves & Publishes Exam (FINAL LOCK)
+export function approveExam(examId, approvalNote = "") {
+  const exams = getExams();
+  const index = exams.findIndex(e => e.id === examId);
+  if (index === -1) return null;
+
+  exams[index].status = EXAM_STATUS.APPROVED;
+  exams[index].approvedAt = new Date().toLocaleString();
+  if (approvalNote) {
+    exams[index].adminFeedback = approvalNote;
+  }
+  saveExams(exams);
+  return exams[index];
+}
+
+// 5. Admin Requests Revision / Returns to Teacher with Notes (UNLOCKS TEACHER)
+export function requestExamRevision(examId, feedbackNote) {
+  const exams = getExams();
+  const index = exams.findIndex(e => e.id === examId);
+  if (index === -1) return null;
+
+  exams[index].status = EXAM_STATUS.REVISION;
+  exams[index].adminFeedback = feedbackNote;
+  saveExams(exams);
+  return exams[index];
+}
+

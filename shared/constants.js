@@ -52,3 +52,39 @@ export const DEFAULT_CHANNELS = [
   { id: "python-ai-lab", name: "🐍 Python & AI Lab", category: "it", desc: "Scripts, data analysis & machine learning experiments" },
   { id: "freelancing-careers", name: "💼 Freelancing & Jobs", category: "all", desc: "Upwork proposals, client handling, portfolio feedback" }
 ];
+
+// Examination Rotation Lifecycle Statuses
+export const EXAM_STATUS = {
+  PENDING_TEACHER: "pending_teacher", // Admin scheduled exam, awaiting teacher question paper submission
+  PENDING_ADMIN: "pending_admin",     // Teacher submitted paper, locked for teacher, awaiting admin approval
+  REVISION: "revision",               // Admin requested revisions, unlocked for teacher with feedback notes
+  APPROVED: "approved"                // Admin approved and published paper (Official locked)
+};
+
+export const EXAM_STATUS_LABELS = {
+  [EXAM_STATUS.PENDING_TEACHER]: {
+    label: "Awaiting Teacher Submission",
+    color: "#eab308", // Yellow
+    bg: "rgba(234, 179, 8, 0.15)",
+    holder: "Teacher Authoring"
+  },
+  [EXAM_STATUS.PENDING_ADMIN]: {
+    label: "Pending Admin Approval",
+    color: "#38bdf8", // Sky blue
+    bg: "rgba(56, 189, 248, 0.15)",
+    holder: "Admin Review"
+  },
+  [EXAM_STATUS.REVISION]: {
+    label: "Revision Requested",
+    color: "#f97316", // Orange
+    bg: "rgba(249, 115, 22, 0.15)",
+    holder: "Teacher Revising"
+  },
+  [EXAM_STATUS.APPROVED]: {
+    label: "Approved & Published",
+    color: "#22c55e", // Green
+    bg: "rgba(34, 197, 94, 0.15)",
+    holder: "Finalized / Published"
+  }
+};
+
