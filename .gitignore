@@ -8,6 +8,7 @@ coverage/
 
 # Production Build outputs
 dist/
+dist-unified/
 build/
 out/
 .next/

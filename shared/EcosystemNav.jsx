@@ -31,6 +31,30 @@ import {
   Users
 } from "lucide-react";
 
+// Universal App URL Resolver: Works seamlessly on both local development and production web URLs
+export function getAppUrl(appId) {
+  if (typeof window === "undefined") {
+    return appId === "website" ? "/" : `/${appId}/`;
+  }
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  if (isLocal) {
+    if (appId === "website") return "http://localhost:5173";
+    if (appId === "messaging") return "http://localhost:5174";
+    if (appId === "management") return "http://localhost:5175";
+  }
+  // Production Web URL (e.g. apex-education-forum.web.app or custom domain)
+  if (appId === "website") return "/";
+  if (appId === "messaging") return "/connect/";
+  if (appId === "management") return "/lms/";
+  return "/";
+}
+
+export function openApexLoginModal() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("apex_open_login"));
+  }
+}
+
 export default function EcosystemNav({ currentApp = "website" }) {
   const [user, setUser] = useState(getCurrentUser());
   
@@ -65,6 +89,12 @@ export default function EcosystemNav({ currentApp = "website" }) {
       setUser(updatedUser);
     });
 
+    // Listen for custom login trigger from locked screens
+    const handleOpenLogin = () => {
+      setShowLoginModal(true);
+    };
+    window.addEventListener("apex_open_login", handleOpenLogin);
+
     // Check URL query parameters for ?activate=TOKEN
     const params = new URLSearchParams(window.location.search);
     const token = params.get("activate");
@@ -87,6 +117,7 @@ export default function EcosystemNav({ currentApp = "website" }) {
 
     return () => {
       unsubAuth();
+      window.removeEventListener("apex_open_login", handleOpenLogin);
       window.removeEventListener("apex_email_dispatched", handleEmailDispatched);
       window.removeEventListener("apex_emails_changed", handleEmailsUpdated);
     };
@@ -124,24 +155,21 @@ export default function EcosystemNav({ currentApp = "website" }) {
       name: "Public Portal",
       desc: "Courses & Admissions",
       icon: Globe,
-      port: 5173,
-      url: "http://localhost:5173"
+      url: getAppUrl("website")
     },
     {
       id: "messaging",
       name: "Apex Connect",
       desc: "Real-time Chat & Voice",
       icon: MessageSquare,
-      port: 5174,
-      url: "http://localhost:5174"
+      url: getAppUrl("messaging")
     },
     {
       id: "management",
       name: "Management LMS",
       desc: "Batches, Fees & Admin",
       icon: LayoutDashboard,
-      port: 5175,
-      url: "http://localhost:5175"
+      url: getAppUrl("management")
     }
   ];
 
@@ -251,7 +279,7 @@ export default function EcosystemNav({ currentApp = "website" }) {
     <header className="ecosystem-nav">
       <div className="nav-container">
         {/* Brand */}
-        <a href="http://localhost:5173" className="nav-brand">
+        <a href={getAppUrl("website")} className="nav-brand">
           <div className="brand-logo">A</div>
           <div>
             <div className="brand-title">APEX EDUCATION FORUM</div>

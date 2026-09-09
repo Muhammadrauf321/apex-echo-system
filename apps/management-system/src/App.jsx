@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import EcosystemNav from "@shared/EcosystemNav.jsx";
+import EcosystemNav, { getAppUrl, openApexLoginModal } from "@shared/EcosystemNav.jsx";
 import { getCurrentUser, subscribeToAuth, createAccountInvitation, getInvitations } from "@shared/auth.js";
 import { 
   getCourses, 
@@ -57,7 +57,8 @@ import {
   GraduationCap,
   Sparkles,
   Copy,
-  ExternalLink
+  ExternalLink,
+  MessageSquare
 } from "lucide-react";
 
 export default function App() {
@@ -598,6 +599,95 @@ export default function App() {
       { id: "my_schedule", label: "My Batch & Schedule", icon: Calendar },
       { id: "attendance", label: "My Attendance Status", icon: CheckSquare },
       { id: "exams", label: "Scheduled Examinations", icon: FileText }
+    );
+  }
+
+  // Strict Login Gate: If no user is authenticated, LMS is completely locked!
+  if (!currentUser) {
+    return (
+      <div style={{ minHeight: "100vh", backgroundColor: "var(--bg-dark)", color: "var(--text-main)", display: "flex", flexDirection: "column" }}>
+        <EcosystemNav currentApp="management" />
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+          <div className="glass-panel" style={{
+            maxWidth: "520px",
+            width: "100%",
+            padding: "40px 32px",
+            borderRadius: "20px",
+            textAlign: "center",
+            boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
+            border: "1px solid rgba(99, 102, 241, 0.3)"
+          }}>
+            <div style={{
+              width: "72px",
+              height: "72px",
+              borderRadius: "50%",
+              background: "rgba(99, 102, 241, 0.15)",
+              border: "1px solid rgba(99, 102, 241, 0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 20px auto",
+              color: "#a5b4fc"
+            }}>
+              <Lock size={32} />
+            </div>
+
+            <div className="badge badge-indigo" style={{ marginBottom: "12px", display: "inline-flex" }}>
+              Restricted Institutional Access
+            </div>
+
+            <h2 style={{ fontSize: "1.6rem", fontWeight: 800, marginBottom: "12px", color: "#ffffff" }}>
+              Apex Management LMS
+            </h2>
+
+            <p style={{ fontSize: "0.92rem", color: "var(--text-muted)", lineHeight: 1.6, marginBottom: "28px" }}>
+              The Management Portal, faculty timetable, admission registers, examination lifecycle, and fee collection are reserved exclusively for authenticated Apex Directors, Instructors, and Enrolled Students.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <button
+                onClick={() => openApexLoginModal()}
+                className="btn-primary"
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  fontSize: "1rem",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "10px",
+                  background: "linear-gradient(135deg, #6366f1, #4f46e5)"
+                }}
+              >
+                <ShieldCheck size={18} />
+                <span>Sign In to Management Portal</span>
+              </button>
+
+              <a
+                href={getAppUrl("website")}
+                className="btn-secondary"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  fontSize: "0.9rem",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px"
+                }}
+              >
+                <span>Return to Public Website</span>
+              </a>
+            </div>
+
+            <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid var(--border-subtle)", fontSize: "0.78rem", color: "var(--text-dim)" }}>
+              Instructors and students receive an activation link with a Temporary Security Code via official invitation dispatched by the Director.
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -1713,7 +1803,7 @@ export default function App() {
                         Need help or want to chat with your batch mates?
                       </div>
                       <a
-                        href="http://localhost:5174"
+                        href={getAppUrl("messaging")}
                         className="btn-primary"
                         style={{ fontSize: "0.85rem", padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: "6px" }}
                       >

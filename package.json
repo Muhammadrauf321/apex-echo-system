@@ -2,6 +2,7 @@
   "name": "apex-echo-system",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Apex Education Forum Ecosystem: Website, Real-Time Messaging App, and Management System",
   "workspaces": [
     "apps/*",
@@ -11,7 +12,7 @@
     "dev:website": "npm --workspace=@apex/website run dev",
     "dev:messaging": "npm --workspace=@apex/messaging-app run dev",
     "dev:management": "npm --workspace=@apex/management-system run dev",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present && node scripts/bundle-unified.js",
     "deploy:firebase": "firebase deploy"
   },
   "keywords": [

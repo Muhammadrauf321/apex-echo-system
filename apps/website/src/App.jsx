@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import EcosystemNav from "@shared/EcosystemNav.jsx";
+import EcosystemNav, { getAppUrl } from "@shared/EcosystemNav.jsx";
 import { getCourses, submitInquiry, verifyCertificate } from "@shared/dataStore.js";
 import { COURSE_CATEGORIES, BATCH_SLOTS } from "@shared/constants.js";
 import { 
@@ -770,9 +770,9 @@ export default function App() {
           <div>
             <div style={{ fontWeight: 700, marginBottom: "14px", color: "#ffffff" }}>Quick Ecosystem Navigation</div>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "8px", fontSize: "0.9rem" }}>
-              <li><a href="http://localhost:5173" style={{ color: "var(--text-muted)", textDecoration: "none" }}>🌐 Public Website & Courses</a></li>
-              <li><a href="http://localhost:5174" style={{ color: "var(--text-muted)", textDecoration: "none" }}>💬 Apex Connect (Messaging App)</a></li>
-              <li><a href="http://localhost:5175" style={{ color: "var(--text-muted)", textDecoration: "none" }}>📊 Apex Management Portal (LMS)</a></li>
+              <li><a href={getAppUrl("website")} style={{ color: "var(--text-muted)", textDecoration: "none" }}>🌐 Public Website & Courses</a></li>
+              <li><a href={getAppUrl("messaging")} style={{ color: "var(--text-muted)", textDecoration: "none" }}>💬 Apex Connect (Messaging App)</a></li>
+              <li><a href={getAppUrl("management")} style={{ color: "var(--text-muted)", textDecoration: "none" }}>📊 Apex Management Portal (LMS)</a></li>
             </ul>
           </div>
 

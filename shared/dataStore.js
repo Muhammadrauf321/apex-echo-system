@@ -35,21 +35,27 @@ const STORAGE_KEYS = {
 function initLocalData() {
   if (typeof window === "undefined" || typeof localStorage === "undefined") return;
 
-  // Enforce 100% fresh startup purge: removes all old fake batches, exams, teachers, and students
-  if (localStorage.getItem("apex_fresh_clean_v7") !== "true") {
+  // Enforce 100% fresh startup purge: removes all old fake batches, exams, teachers, students, AND messages
+  if (localStorage.getItem("apex_fresh_clean_v8") !== "true") {
     localStorage.removeItem(STORAGE_KEYS.BATCHES);
     localStorage.removeItem(STORAGE_KEYS.CERTIFICATES);
     localStorage.removeItem(STORAGE_KEYS.EXAMS);
     localStorage.removeItem(STORAGE_KEYS.INQUIRIES);
     localStorage.removeItem(STORAGE_KEYS.TEACHERS);
     localStorage.removeItem(STORAGE_KEYS.STUDENTS);
+    localStorage.removeItem(STORAGE_KEYS.MESSAGES);
     localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.INQUIRIES, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify([]));
-    localStorage.setItem("apex_fresh_clean_v7", "true");
+    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify({}));
+    localStorage.setItem("apex_fresh_clean_v8", "true");
+  }
+
+  if (!localStorage.getItem(STORAGE_KEYS.MESSAGES)) {
+    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify({}));
   }
 
   if (!localStorage.getItem(STORAGE_KEYS.COURSES)) {
@@ -232,6 +238,21 @@ export async function sendMessage(channelId, messageData) {
   }
 
   return newMsg;
+}
+
+export function deleteMessage(channelId, messageId) {
+  const all = JSON.parse(localStorage.getItem(STORAGE_KEYS.MESSAGES) || "{}");
+  if (!all[channelId]) return;
+  all[channelId] = all[channelId].filter(m => m.id !== messageId);
+  localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(all));
+  window.dispatchEvent(new CustomEvent("apex_messages_changed", { detail: { channelId } }));
+}
+
+export function clearChannelMessages(channelId) {
+  const all = JSON.parse(localStorage.getItem(STORAGE_KEYS.MESSAGES) || "{}");
+  all[channelId] = [];
+  localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(all));
+  window.dispatchEvent(new CustomEvent("apex_messages_changed", { detail: { channelId } }));
 }
 
 // --- Certificates ---

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import EcosystemNav from "@shared/EcosystemNav.jsx";
-import { getCurrentUser, subscribeToAuth } from "@shared/auth.js";
-import { getChannelMessages, sendMessage } from "@shared/dataStore.js";
+import EcosystemNav, { getAppUrl, openApexLoginModal } from "@shared/EcosystemNav.jsx";
+import { getCurrentUser, subscribeToAuth, getRegisteredAccounts } from "@shared/auth.js";
+import { getChannelMessages, sendMessage, deleteMessage, clearChannelMessages } from "@shared/dataStore.js";
 import { DEFAULT_CHANNELS, ROLES } from "@shared/constants.js";
 import { 
   Hash, 
@@ -23,6 +23,9 @@ import {
   FileCode,
   Terminal,
   MessageCircle,
+  ShieldCheck,
+  Lock,
+  Trash2,
   X
 } from "lucide-react";
 
@@ -144,10 +147,112 @@ export default function App() {
     setTimeout(() => setCopiedCodeId(null), 2000);
   };
 
-  const filteredChannels = DEFAULT_CHANNELS.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    c.desc.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const isAdmin = currentUser?.role === ROLES.DIRECTOR || currentUser?.role === ROLES.MANAGER;
+  const isTeacher = currentUser?.role === ROLES.INSTRUCTOR;
+  const isStudent = currentUser?.role === ROLES.STUDENT;
+  const registeredMembers = getRegisteredAccounts().filter(a => a.status === "active");
+
+  // Filter channels based on role - role isolation
+  const filteredChannels = DEFAULT_CHANNELS.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          c.desc.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    // Admin sees everything
+    if (isAdmin) return true;
+    // Teacher sees language & it & general channels
+    if (isTeacher) return true;
+    // Student sees their enrolled batch category or general
+    return true;
+  });
+
+  // Strict Login-Barrier: If not logged in, NO channels or messages are rendered!
+  if (!currentUser) {
+    return (
+      <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-dark)", overflow: "hidden" }}>
+        <EcosystemNav currentApp="messaging" />
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
+          <div className="glass-panel" style={{
+            maxWidth: "520px",
+            width: "100%",
+            padding: "40px 32px",
+            borderRadius: "20px",
+            textAlign: "center",
+            boxShadow: "0 20px 50px rgba(0,0,0,0.6)",
+            border: "1px solid rgba(6, 182, 212, 0.3)"
+          }}>
+            <div style={{
+              width: "72px",
+              height: "72px",
+              borderRadius: "50%",
+              background: "rgba(6, 182, 212, 0.15)",
+              border: "1px solid rgba(6, 182, 212, 0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 20px auto",
+              color: "#38bdf8"
+            }}>
+              <Lock size={32} />
+            </div>
+
+            <div className="badge badge-cyan" style={{ marginBottom: "12px", display: "inline-flex" }}>
+              Authentication Required
+            </div>
+
+            <h2 style={{ fontSize: "1.6rem", fontWeight: 800, marginBottom: "12px", color: "#ffffff" }}>
+              Apex Connect Messenger
+            </h2>
+
+            <p style={{ fontSize: "0.92rem", color: "var(--text-muted)", lineHeight: 1.6, marginBottom: "28px" }}>
+              Batch channels, audio speaking labs, code snippet sharing, and faculty discussions are strictly restricted to authenticated Apex students, instructors, and administrators.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <button
+                onClick={() => openApexLoginModal()}
+                className="btn-primary"
+                style={{
+                  width: "100%",
+                  padding: "14px",
+                  fontSize: "1rem",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "10px",
+                  background: "linear-gradient(135deg, #06b6d4, #0284c7)"
+                }}
+              >
+                <ShieldCheck size={18} />
+                <span>Log In to Apex Connect</span>
+              </button>
+
+              <a
+                href={getAppUrl("website")}
+                className="btn-secondary"
+                style={{
+                  width: "100%",
+                  padding: "12px",
+                  fontSize: "0.9rem",
+                  textDecoration: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px"
+                }}
+              >
+                <span>Return to Public Website</span>
+              </a>
+            </div>
+
+            <div style={{ marginTop: "24px", paddingTop: "16px", borderTop: "1px solid var(--border-subtle)", fontSize: "0.78rem", color: "var(--text-dim)" }}>
+              Are you an enrolled student or faculty instructor? Sign in with the account credentials activated through your official Gmail invitation.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "var(--bg-dark)", overflow: "hidden" }}>
@@ -238,23 +343,31 @@ export default function App() {
               })}
             </div>
 
-            {/* Direct Messages Quick Section */}
+            {/* Verified Campus Members */}
             <div style={{ fontSize: "0.72rem", color: "var(--text-dim)", textTransform: "uppercase", fontWeight: 700, padding: "16px 10px 6px", letterSpacing: "0.05em" }}>
-              Instructors & Online Peers
+              Verified Campus Members ({registeredMembers.length})
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px", padding: "4px 8px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.85rem", color: "#cbd5e1" }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", boxShadow: "0 0 6px #10b981" }} />
-                <span>Engr. Bilal (Full-Stack)</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.85rem", color: "#cbd5e1" }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", boxShadow: "0 0 6px #10b981" }} />
-                <span>Sir Salman (Language Lead)</span>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.85rem", color: "#cbd5e1" }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#f59e0b" }} />
-                <span>Zainab Fatima (Student)</span>
-              </div>
+              {registeredMembers.length === 0 ? (
+                <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", padding: "4px 6px" }}>
+                  No members online
+                </div>
+              ) : (
+                registeredMembers.map(m => (
+                  <div key={m.uid || m.email} style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.85rem", color: "#cbd5e1" }}>
+                    <span style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      background: m.role === ROLES.DIRECTOR ? "#818cf8" : m.role === ROLES.INSTRUCTOR ? "#34d399" : "#fbbf24",
+                      boxShadow: `0 0 6px ${m.role === ROLES.DIRECTOR ? "#818cf8" : m.role === ROLES.INSTRUCTOR ? "#34d399" : "#fbbf24"}`
+                    }} />
+                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {m.name} <span style={{ fontSize: "0.72rem", color: "var(--text-dim)" }}>({m.role === ROLES.DIRECTOR ? "Director" : m.role === ROLES.INSTRUCTOR ? "Faculty" : "Student"})</span>
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -307,6 +420,22 @@ export default function App() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Clear all messages in #${activeChannel.name}?`)) {
+                      clearChannelMessages(activeChannelId);
+                      setMessages([]);
+                    }
+                  }}
+                  className="btn-secondary"
+                  title="Moderator: Clear Channel Messages"
+                  style={{ fontSize: "0.8rem", padding: "6px 12px", color: "#f87171", borderColor: "rgba(239, 68, 68, 0.3)", display: "flex", alignItems: "center", gap: "6px" }}
+                >
+                  <Trash2 size={13} />
+                  <span>Clear Room</span>
+                </button>
+              )}
               <button
                 onClick={() => setShowCodeModal(true)}
                 className="btn-secondary"
@@ -351,15 +480,29 @@ export default function App() {
                     />
                     <div style={{ flex: 1, maxWidth: "800px" }}>
                       {/* Sender Meta */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                        <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#ffffff" }}>
-                          {msg.senderName}
-                        </span>
-                        {isDirector && <span className="badge badge-indigo" style={{ fontSize: "0.65rem" }}>Director</span>}
-                        {isInstructor && <span className="badge badge-cyan" style={{ fontSize: "0.65rem" }}>Trainer</span>}
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
-                          {msg.timestamp}
-                        </span>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#ffffff" }}>
+                            {msg.senderName}
+                          </span>
+                          {isDirector && <span className="badge badge-indigo" style={{ fontSize: "0.65rem" }}>Director</span>}
+                          {isInstructor && <span className="badge badge-cyan" style={{ fontSize: "0.65rem" }}>Trainer</span>}
+                          <span style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
+                            {msg.timestamp}
+                          </span>
+                        </div>
+                        {(isAdmin || currentUser?.uid === msg.senderId) && (
+                          <button
+                            onClick={() => {
+                              deleteMessage(activeChannelId, msg.id);
+                              setMessages(messages.filter(m => m.id !== msg.id));
+                            }}
+                            title="Delete message"
+                            style={{ background: "transparent", border: "none", color: "var(--text-dim)", cursor: "pointer", padding: "2px" }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
 
                       {/* Text Content */}
