@@ -456,12 +456,12 @@ export default function App() {
     setNewTeacherForm({ name: "", email: "", department: "IT & Web Development", phone: "" });
 
     setStatusBanner({
-      type: "success",
+      type: isFirebase || isSentViaEmailJS ? "success" : "warning",
       message: isFirebase
         ? `🔥 Official activation email dispatched directly via Google Firebase to ${newTeacherForm.email}! (Security Code: ${tempCode})`
         : isSentViaEmailJS
         ? `✓ Activation email delivered directly to ${newTeacherForm.email} inbox via EmailJS! Security Code: ${tempCode}.`
-        : `Activation invitation created for ${newTeacherForm.email} (Security Code: ${tempCode}). You can also click "Send via Gmail" or dispatch via Firebase from the outbox.`
+        : `Invitation created (Security Code: ${tempCode}). Notice: To send automated emails, enable 'Email/Password' in Firebase Console > Authentication. Alternatively, teacher can click '1-Click Activate with Google' to activate instantly!`
     });
   };
 
@@ -507,12 +507,12 @@ export default function App() {
     });
 
     setStatusBanner({
-      type: "success",
+      type: isFirebase || isSentViaEmailJS ? "success" : "warning",
       message: isFirebase
         ? `🔥 Official activation email dispatched directly via Google Firebase to ${newStudentForm.email}! (Security Code: ${tempCode})`
         : isSentViaEmailJS
         ? `✓ Activation email delivered directly to ${newStudentForm.email} inbox via EmailJS! Security Code: ${tempCode}.`
-        : `Activation invitation created for ${newStudentForm.email} (Security Code: ${tempCode}). Student can now activate their ID.`
+        : `Student enrolled (Security Code: ${tempCode}). Enable 'Email/Password' in Firebase Console for automated email, or student can click '1-Click Activate with Google' directly.`
     });
   };
 
@@ -526,12 +526,12 @@ export default function App() {
     const isFirebase = inviteRes?.deliveryStatus === "delivered_firebase" || inviteRes?.email?.deliveryProvider === "Firebase";
     const isSentViaEmailJS = inviteRes?.deliveryStatus === "delivered_emailjs";
     setStatusBanner({
-      type: "success",
+      type: isFirebase || isSentViaEmailJS ? "success" : "warning",
       message: isFirebase
         ? `🔥 Official activation email dispatched directly via Google Firebase to ${recipientEmail}! (Security Code: ${inviteRes.invitation?.tempCode})`
         : isSentViaEmailJS
         ? `✓ Activation email delivered directly to ${recipientEmail} inbox via EmailJS! (Security Code: ${inviteRes.invitation?.tempCode}).`
-        : `Activation invitation regenerated for ${recipientEmail} (Security Code: ${inviteRes.invitation?.tempCode}). Use "Send via Gmail" for 1-click delivery.`
+        : `Invitation code: ${inviteRes.invitation?.tempCode}. Enable 'Email/Password' in Firebase Console for automated inbox delivery, or user can click '1-Click Activate with Google'.`
     });
   };
 

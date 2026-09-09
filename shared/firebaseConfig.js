@@ -11,7 +11,11 @@ export const firebaseConfig = {
   authDomain: "apex-education-forum.firebaseapp.com",
   messagingSenderId: "565567118952",
   measurementId: "G-K905LZVESC",
-  googleClientId: "565567118952-fab5ktqn3n9ruk53930pkgbu3cdrccsh.apps.googleusercontent.com"
+  googleClientId: "273623412555-n0jm5hld89dtpcekbqanb3o9rivsl8ec.apps.googleusercontent.com",
+  googleClientIds: [
+    "273623412555-n0jm5hld89dtpcekbqanb3o9rivsl8ec.apps.googleusercontent.com",
+    "565567118952-fab5ktqn3n9ruk53930pkgbu3cdrccsh.apps.googleusercontent.com"
+  ]
 };
 
 // Initialize Firebase App

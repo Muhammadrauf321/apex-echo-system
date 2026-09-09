@@ -19,7 +19,42 @@ export async function sendFirebaseActivationEmail({ recipientEmail, recipientNam
   const redirectUrl = activationUrl || `https://apex-education-forum.web.app/?activate=${tempCode}&email=${encodeURIComponent(cleanEmail)}`;
 
   try {
-    // 1. Call Google Firebase Identity Toolkit sendOobCode endpoint directly
+    // 1. Pre-flight check & Provisioning:
+    // Firebase ONLY sends emails if Email/Password provider is enabled AND user exists in Firebase Auth.
+    let providerEnabled = true;
+    let userExistsInAuth = false;
+
+    try {
+      const probeRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password: `ApexPass#${Math.floor(100000 + Math.random() * 900000)}`,
+          returnSecureToken: false
+        })
+      });
+      const probeData = await probeRes.json();
+
+      if (!probeRes.ok) {
+        if (probeData?.error?.message === "OPERATION_NOT_ALLOWED") {
+          providerEnabled = false;
+          return {
+            success: false,
+            code: "OPERATION_NOT_ALLOWED",
+            error: "Firebase Email/Password provider is DISABLED in Firebase Console. Please open Firebase Console > Authentication > Sign-in method and click 'Enable' on Email/Password."
+          };
+        } else if (probeData?.error?.message === "EMAIL_EXISTS") {
+          userExistsInAuth = true;
+        }
+      } else {
+        userExistsInAuth = true;
+      }
+    } catch (e) {
+      console.warn("Probe check failed, proceeding to sendOobCode:", e);
+    }
+
+    // 2. Call Google Firebase Identity Toolkit sendOobCode endpoint directly
     const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`, {
       method: "POST",
       headers: {
