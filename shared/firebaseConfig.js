@@ -10,7 +10,8 @@ export const firebaseConfig = {
   apiKey: "AIzaSyDeEuWXvLcc_QG0kfX7d3y9AQEDdm8g2yk",
   authDomain: "apex-education-forum.firebaseapp.com",
   messagingSenderId: "565567118952",
-  measurementId: "G-K905LZVESC"
+  measurementId: "G-K905LZVESC",
+  googleClientId: "565567118952-fab5ktqn3n9ruk53930pkgbu3cdrccsh.apps.googleusercontent.com"
 };
 
 // Initialize Firebase App

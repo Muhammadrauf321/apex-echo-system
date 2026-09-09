@@ -4,11 +4,14 @@ import {
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   signOut as fbSignOut, 
-  onAuthStateChanged 
+  onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { sendActivationEmail, generateGmailComposeUrl } from "./emailService.js";
 import { sendFirebaseActivationEmail } from "./firebaseEmailService.js";
+import { ROLES } from "./constants.js";
 
 const CURRENT_USER_KEY = "apex_current_user";
 const ACCOUNTS_KEY = "apex_registered_accounts";
@@ -639,4 +642,84 @@ export async function logout() {
   }
   setCurrentUser(null);
   return { success: true };
+}
+
+// Sign in with Google (Popup) - Instant 1-Click Verification & Activation
+export async function loginWithGoogle() {
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    const result = await signInWithPopup(auth, provider);
+    const fbUser = result.user;
+    const cleanEmail = fbUser.email.toLowerCase();
+
+    // Check if user is Director / Admin
+    const isAdminEmail = cleanEmail === "muhammadraufbaloch6@gmail.com" || cleanEmail === ADMIN_USER.email.toLowerCase();
+    
+    // Check if user has a pending invitation (Faculty or Student)
+    const invitations = getInvitations();
+    const pendingInv = invitations.find(i => i.email.toLowerCase() === cleanEmail && i.status === "pending_activation");
+
+    let role = ROLES.STUDENT;
+    let name = fbUser.displayName || cleanEmail.split("@")[0];
+    let department = "";
+    let course = "";
+    let batchCode = "";
+
+    if (isAdminEmail) {
+      role = ROLES.DIRECTOR;
+      name = "Engr. Muhammad Rauf";
+    } else if (pendingInv) {
+      role = pendingInv.role === "instructor" ? ROLES.INSTRUCTOR : ROLES.STUDENT;
+      name = pendingInv.name || name;
+      department = pendingInv.department || "";
+      course = pendingInv.course || "";
+      batchCode = pendingInv.batchCode || "";
+      
+      // Auto-activate the invitation
+      const updatedInvs = invitations.map(i => i.id === pendingInv.id ? { ...i, status: "activated", activatedAt: new Date().toISOString() } : i);
+      saveInvitations(updatedInvs);
+    } else {
+      // Check existing accounts
+      const accounts = getRegisteredAccounts();
+      const existing = accounts.find(a => a.email.toLowerCase() === cleanEmail);
+      if (existing) {
+        role = existing.role || ROLES.STUDENT;
+        name = existing.name || name;
+        department = existing.department || "";
+        course = existing.course || "";
+        batchCode = existing.batchCode || "";
+      }
+    }
+
+    const userData = {
+      uid: fbUser.uid,
+      name,
+      email: cleanEmail,
+      role,
+      department,
+      course,
+      batchCode,
+      avatar: fbUser.photoURL || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`,
+      status: "active"
+    };
+
+    // Save to Firestore
+    try {
+      await setDoc(doc(db, "users", fbUser.uid), userData, { merge: true });
+    } catch (fsErr) {
+      console.warn("Firestore sync warning:", fsErr);
+    }
+
+    // Register account locally
+    const accounts = getRegisteredAccounts();
+    const filtered = accounts.filter(a => a.email.toLowerCase() !== cleanEmail);
+    saveRegisteredAccounts([userData, ...filtered]);
+
+    setCurrentUser(userData);
+    return { success: true, user: userData };
+  } catch (err) {
+    console.error("Google sign in error:", err);
+    return { success: false, error: err.message || "Failed to sign in with Google" };
+  }
 }
