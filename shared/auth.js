@@ -8,6 +8,7 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { sendActivationEmail, generateGmailComposeUrl } from "./emailService.js";
+import { sendFirebaseActivationEmail } from "./firebaseEmailService.js";
 
 const CURRENT_USER_KEY = "apex_current_user";
 const ACCOUNTS_KEY = "apex_registered_accounts";
@@ -341,30 +342,47 @@ export async function createAccountInvitation({ name, email, role, department = 
     tempCode
   });
 
-  // Attempt real EmailJS dispatch in the background
+  // 1. Attempt official Firebase direct delivery (free Google mail servers)
   let deliveryStatus = "pending";
   let deliveryError = null;
+  let deliveryProvider = "Firebase";
 
   try {
-    const emailRes = await sendActivationEmail({
+    const fbRes = await sendFirebaseActivationEmail({
       recipientEmail: cleanEmail,
       recipientName: name.trim(),
       role: roleName,
       activationUrl,
       tempCode
     });
-    if (emailRes.success) {
-      deliveryStatus = "delivered_emailjs";
-    } else if (emailRes.unconfigured) {
-      deliveryStatus = "pending_emailjs_config";
-      deliveryError = emailRes.error;
+
+    if (fbRes.success) {
+      deliveryStatus = "delivered_firebase";
+      deliveryProvider = "Firebase";
     } else {
-      deliveryStatus = "failed_emailjs";
-      deliveryError = emailRes.error;
+      console.warn("Firebase email dispatch notice:", fbRes.error);
+      // 2. Fallback to EmailJS if configured
+      const emailRes = await sendActivationEmail({
+        recipientEmail: cleanEmail,
+        recipientName: name.trim(),
+        role: roleName,
+        activationUrl,
+        tempCode
+      });
+      if (emailRes.success) {
+        deliveryStatus = "delivered_emailjs";
+        deliveryProvider = "EmailJS";
+      } else if (emailRes.unconfigured) {
+        deliveryStatus = "pending_delivery";
+        deliveryError = fbRes.error || emailRes.error;
+      } else {
+        deliveryStatus = "failed";
+        deliveryError = fbRes.error || emailRes.error;
+      }
     }
   } catch (e) {
-    deliveryStatus = "failed_emailjs";
-    deliveryError = e?.message || "Failed to dispatch via EmailJS";
+    deliveryStatus = "failed";
+    deliveryError = e?.message || "Failed to dispatch email";
   }
 
   const emailObject = {
@@ -379,6 +397,7 @@ export async function createAccountInvitation({ name, email, role, department = 
     gmailComposeUrl,
     deliveryStatus,
     deliveryError,
+    deliveryProvider,
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     bodyPreview: `Dear ${name}, Admin has enrolled you as ${roleName}. Please use temporary security code ${tempCode} or the link below to set your permanent password.`,

@@ -451,14 +451,17 @@ export default function App() {
     setTeachers(getTeachers());
     setShowTeacherModal(false);
     const tempCode = inviteRes.success ? inviteRes.invitation.tempCode : "";
+    const isFirebase = inviteRes?.deliveryStatus === "delivered_firebase" || inviteRes?.email?.deliveryProvider === "Firebase";
     const isSentViaEmailJS = inviteRes?.deliveryStatus === "delivered_emailjs";
     setNewTeacherForm({ name: "", email: "", department: "IT & Web Development", phone: "" });
 
     setStatusBanner({
       type: "success",
-      message: isSentViaEmailJS
+      message: isFirebase
+        ? `🔥 Official activation email dispatched directly via Google Firebase to ${newTeacherForm.email}! (Security Code: ${tempCode})`
+        : isSentViaEmailJS
         ? `✓ Activation email delivered directly to ${newTeacherForm.email} inbox via EmailJS! Security Code: ${tempCode}.`
-        : `Activation invitation created for ${newTeacherForm.email} (Security Code: ${tempCode}). You can also click "Send via Gmail Web" in the directory or configure EmailJS in the top bar.`
+        : `Activation invitation created for ${newTeacherForm.email} (Security Code: ${tempCode}). You can also click "Send via Gmail" or dispatch via Firebase from the outbox.`
     });
   };
 
@@ -492,6 +495,7 @@ export default function App() {
     setStudents(getStudents());
     setShowEnrollStudentModal(false);
     const tempCode = inviteRes.success ? inviteRes.invitation.tempCode : "";
+    const isFirebase = inviteRes?.deliveryStatus === "delivered_firebase" || inviteRes?.email?.deliveryProvider === "Firebase";
     const isSentViaEmailJS = inviteRes?.deliveryStatus === "delivered_emailjs";
     setNewStudentForm({
       name: "",
@@ -504,7 +508,9 @@ export default function App() {
 
     setStatusBanner({
       type: "success",
-      message: isSentViaEmailJS
+      message: isFirebase
+        ? `🔥 Official activation email dispatched directly via Google Firebase to ${newStudentForm.email}! (Security Code: ${tempCode})`
+        : isSentViaEmailJS
         ? `✓ Activation email delivered directly to ${newStudentForm.email} inbox via EmailJS! Security Code: ${tempCode}.`
         : `Activation invitation created for ${newStudentForm.email} (Security Code: ${tempCode}). Student can now activate their ID.`
     });
@@ -517,12 +523,15 @@ export default function App() {
       email: recipientEmail,
       role
     });
+    const isFirebase = inviteRes?.deliveryStatus === "delivered_firebase" || inviteRes?.email?.deliveryProvider === "Firebase";
     const isSentViaEmailJS = inviteRes?.deliveryStatus === "delivered_emailjs";
     setStatusBanner({
       type: "success",
-      message: isSentViaEmailJS
+      message: isFirebase
+        ? `🔥 Official activation email dispatched directly via Google Firebase to ${recipientEmail}! (Security Code: ${inviteRes.invitation?.tempCode})`
+        : isSentViaEmailJS
         ? `✓ Activation email delivered directly to ${recipientEmail} inbox via EmailJS! (Security Code: ${inviteRes.invitation?.tempCode}).`
-        : `Activation invitation regenerated for ${recipientEmail} (Security Code: ${inviteRes.invitation?.tempCode}). You can also use "Send via Gmail" for 1-click delivery.`
+        : `Activation invitation regenerated for ${recipientEmail} (Security Code: ${inviteRes.invitation?.tempCode}). Use "Send via Gmail" for 1-click delivery.`
     });
   };
 

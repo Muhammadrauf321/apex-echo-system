@@ -41,6 +41,7 @@ import {
   sendActivationEmail,
   generateGmailComposeUrl
 } from "./emailService.js";
+import { sendFirebaseActivationEmail } from "./firebaseEmailService.js";
 
 // Universal App URL Resolver: Works seamlessly on both local development and production web URLs
 export function getAppUrl(appId) {
@@ -154,6 +155,40 @@ export default function EcosystemNav({ currentApp = "website" }) {
       setEmailConfigSaveMessage("");
       setShowEmailConfigModal(false);
     }, 1500);
+  };
+
+  const handleSendFirebaseEmail = async (mail) => {
+    setIsSendingLiveEmail(`fb_${mail.id}`);
+    const res = await sendFirebaseActivationEmail({
+      recipientEmail: mail.recipientEmail,
+      recipientName: mail.recipientName,
+      role: mail.role,
+      activationUrl: mail.activationUrl,
+      tempCode: mail.tempCode
+    });
+    setIsSendingLiveEmail(null);
+
+    const current = getDispatchedEmails();
+    const updated = current.map(m => {
+      if (m.id === mail.id) {
+        return {
+          ...m,
+          deliveryStatus: res.success ? "delivered_firebase" : "failed_firebase",
+          deliveryError: res.error || null,
+          deliveryProvider: "Firebase"
+        };
+      }
+      return m;
+    });
+    saveDispatchedEmails(updated);
+    setDispatchedEmails(updated);
+
+    if (res.success) {
+      confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+      alert(`✓ Official Activation Email sent directly via Google Firebase to ${mail.recipientEmail}!`);
+    } else {
+      alert(`Firebase Notice: ${res.error || "Could not dispatch via Firebase. You can use 'Open in Gmail' as a 1-click fallback."}`);
+    }
   };
 
   const handleSendLiveEmail = async (mail) => {
@@ -663,11 +698,11 @@ export default function EcosystemNav({ currentApp = "website" }) {
               </div>
             </div>
 
-            {/* EmailJS Status Banner */}
+            {/* Direct Delivery Engine Banner */}
             <div style={{ padding: "12px 24px 0 24px" }}>
               <div style={{
-                background: emailConfig.isEnabled && emailConfig.serviceId ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)",
-                border: emailConfig.isEnabled && emailConfig.serviceId ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(245, 158, 11, 0.3)",
+                background: "rgba(245, 158, 11, 0.1)",
+                border: "1px solid rgba(245, 158, 11, 0.3)",
                 borderRadius: "10px",
                 padding: "10px 14px",
                 display: "flex",
@@ -676,13 +711,11 @@ export default function EcosystemNav({ currentApp = "website" }) {
                 gap: "10px"
               }}>
                 <div>
-                  <div style={{ fontSize: "0.82rem", fontWeight: 700, color: emailConfig.isEnabled && emailConfig.serviceId ? "#34d399" : "#fbbf24" }}>
-                    {emailConfig.isEnabled && emailConfig.serviceId ? "● Automated Inbox Delivery Active" : "⚠️ EmailJS Keys Needed for Auto-Inbox"}
+                  <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#fbbf24", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>🔥 Google Firebase Direct Delivery Active</span>
                   </div>
                   <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                    {emailConfig.isEnabled && emailConfig.serviceId
-                      ? "Emails dispatch automatically via EmailJS directly to faculty inboxes."
-                      : "Click 'Configure' to connect your EmailJS credentials or use 'Open in Gmail Web'."}
+                    Official invitations are dispatched via Google Firebase Authentication servers directly to recipient Gmail inboxes.
                   </div>
                 </div>
                 <button
@@ -690,7 +723,7 @@ export default function EcosystemNav({ currentApp = "website" }) {
                   className="btn-secondary"
                   style={{ padding: "5px 10px", fontSize: "0.72rem", whiteSpace: "nowrap" }}
                 >
-                  Configure
+                  EmailJS Settings
                 </button>
               </div>
             </div>
@@ -707,8 +740,10 @@ export default function EcosystemNav({ currentApp = "website" }) {
                 </div>
               ) : (
                 dispatchedEmails.map((mail) => {
-                  const isDelivered = mail.deliveryStatus === "delivered_emailjs";
-                  const isFailed = mail.deliveryStatus === "failed_emailjs";
+                  const isFirebase = mail.deliveryStatus === "delivered_firebase" || mail.deliveryProvider === "Firebase";
+                  const isEmailJS = mail.deliveryStatus === "delivered_emailjs" || mail.deliveryProvider === "EmailJS";
+                  const isDelivered = isFirebase || isEmailJS;
+                  const isFailed = mail.deliveryStatus === "failed" || mail.deliveryStatus === "failed_emailjs" || mail.deliveryStatus === "failed_firebase";
                   const composeLink = mail.gmailComposeUrl || generateGmailComposeUrl(mail);
 
                   return (
@@ -741,11 +776,11 @@ export default function EcosystemNav({ currentApp = "website" }) {
                             fontWeight: 700,
                             display: "inline-block",
                             marginTop: "3px",
-                            background: isDelivered ? "rgba(16, 185, 129, 0.15)" : isFailed ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                            color: isDelivered ? "#34d399" : isFailed ? "#f87171" : "#fbbf24",
-                            border: `1px solid ${isDelivered ? "rgba(16, 185, 129, 0.3)" : isFailed ? "rgba(239, 68, 68, 0.3)" : "rgba(245, 158, 11, 0.3)"}`
+                            background: isFirebase ? "rgba(245, 158, 11, 0.15)" : isEmailJS ? "rgba(16, 185, 129, 0.15)" : isFailed ? "rgba(239, 68, 68, 0.15)" : "rgba(148, 163, 184, 0.15)",
+                            color: isFirebase ? "#fbbf24" : isEmailJS ? "#34d399" : isFailed ? "#f87171" : "#94a3b8",
+                            border: `1px solid ${isFirebase ? "rgba(245, 158, 11, 0.3)" : isEmailJS ? "rgba(16, 185, 129, 0.3)" : isFailed ? "rgba(239, 68, 68, 0.3)" : "rgba(148, 163, 184, 0.3)"}`
                           }}>
-                            {isDelivered ? "✓ Inbox Sent (EmailJS)" : isFailed ? "✕ Delivery Failed" : "● Stored in Portal"}
+                            {isFirebase ? "✓ Sent (Firebase)" : isEmailJS ? "✓ Sent (EmailJS)" : isFailed ? "✕ Delivery Failed" : "● Stored in Portal"}
                           </span>
                         </div>
                       </div>
@@ -768,7 +803,7 @@ export default function EcosystemNav({ currentApp = "website" }) {
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexWrap: "wrap", alignItems: "center" }}>
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(mail.activationUrl);
@@ -780,6 +815,28 @@ export default function EcosystemNav({ currentApp = "website" }) {
                         >
                           {copiedId === mail.id ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
                           <span>{copiedId === mail.id ? "Copied" : "Copy Link"}</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleSendFirebaseEmail(mail)}
+                          disabled={isSendingLiveEmail === `fb_${mail.id}`}
+                          style={{
+                            padding: "6px 12px",
+                            fontSize: "0.78rem",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            borderRadius: "8px",
+                            background: "rgba(245, 158, 11, 0.15)",
+                            border: "1px solid rgba(245, 158, 11, 0.35)",
+                            color: "#fbbf24",
+                            fontWeight: 600,
+                            cursor: "pointer"
+                          }}
+                          title="Send directly from Google Firebase servers"
+                        >
+                          <RefreshCw size={13} className={isSendingLiveEmail === `fb_${mail.id}` ? "animate-spin" : ""} />
+                          <span>{isSendingLiveEmail === `fb_${mail.id}` ? "Sending..." : "Send via Firebase"}</span>
                         </button>
 
                         <a
