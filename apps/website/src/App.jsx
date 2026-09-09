@@ -715,7 +715,7 @@ export default function App() {
               Modules & Hands-on Topics:
             </h4>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "24px" }}>
-              {selectedCourseModal.modules.map((mod, i) => (
+              {(selectedCourseModal.modules || []).map((mod, i) => (
                 <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", fontSize: "0.92rem", color: "#cbd5e1" }}>
                   <span style={{
                     width: "22px",

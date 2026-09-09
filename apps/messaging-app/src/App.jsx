@@ -781,11 +781,14 @@ export default function App() {
           alignItems: "center",
           justifyContent: "center",
           padding: "20px",
-          zIndex: 9999
+          zIndex: 9999,
+          overflowY: "auto"
         }}>
           <div className="glass-panel" style={{
             maxWidth: "600px",
             width: "100%",
+            maxHeight: "calc(100vh - 40px)",
+            overflowY: "auto",
             padding: "28px",
             borderRadius: "var(--radius-lg)"
           }}>

@@ -2876,9 +2876,10 @@ export default function App() {
           alignItems: "center",
           justifyContent: "center",
           padding: "20px",
-          zIndex: 9999
+          zIndex: 9999,
+          overflowY: "auto"
         }}>
-          <div className="glass-panel" style={{ maxWidth: "480px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
+          <div className="glass-panel" style={{ maxWidth: "480px", width: "100%", maxHeight: "calc(100vh - 40px)", overflowY: "auto", padding: "28px", borderRadius: "var(--radius-lg)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <Mail size={20} color="#38bdf8" />
@@ -2965,9 +2966,10 @@ export default function App() {
           alignItems: "center",
           justifyContent: "center",
           padding: "20px",
-          zIndex: 9999
+          zIndex: 9999,
+          overflowY: "auto"
         }}>
-          <div className="glass-panel" style={{ maxWidth: "500px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
+          <div className="glass-panel" style={{ maxWidth: "500px", width: "100%", maxHeight: "calc(100vh - 40px)", overflowY: "auto", padding: "28px", borderRadius: "var(--radius-lg)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <GraduationCap size={20} color="#38bdf8" />
@@ -3076,9 +3078,10 @@ export default function App() {
           alignItems: "center",
           justifyContent: "center",
           padding: "20px",
-          zIndex: 9999
+          zIndex: 9999,
+          overflowY: "auto"
         }}>
-          <div className="glass-panel" style={{ maxWidth: "600px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
+          <div className="glass-panel" style={{ maxWidth: "600px", width: "100%", maxHeight: "calc(100vh - 40px)", overflowY: "auto", padding: "28px", borderRadius: "var(--radius-lg)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>Schedule Institutional Examination</h3>
               <button onClick={() => setShowScheduleExamModal(false)} style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}>
@@ -3479,9 +3482,10 @@ export default function App() {
           alignItems: "center",
           justifyContent: "center",
           padding: "20px",
-          zIndex: 9999
+          zIndex: 9999,
+          overflowY: "auto"
         }}>
-          <div className="glass-panel" style={{ maxWidth: "500px", width: "100%", padding: "24px", borderRadius: "var(--radius-lg)" }}>
+          <div className="glass-panel" style={{ maxWidth: "500px", width: "100%", maxHeight: "calc(100vh - 40px)", overflowY: "auto", padding: "24px", borderRadius: "var(--radius-lg)" }}>
             <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#f97316", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
               <RotateCcw size={16} />
               <span>Return Paper for Revision</span>
@@ -3584,9 +3588,10 @@ export default function App() {
           alignItems: "center",
           justifyContent: "center",
           padding: "20px",
-          zIndex: 9999
+          zIndex: 9999,
+          overflowY: "auto"
         }}>
-          <div className="glass-panel" style={{ maxWidth: "520px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
+          <div className="glass-panel" style={{ maxWidth: "520px", width: "100%", maxHeight: "calc(100vh - 40px)", overflowY: "auto", padding: "28px", borderRadius: "var(--radius-lg)" }}>
             <h3 style={{ fontSize: "1.2rem", fontWeight: 800, marginBottom: "16px" }}>Schedule New Batch</h3>
             <form onSubmit={handleCreateBatch}>
               <div style={{ marginBottom: "12px" }}>
@@ -3706,9 +3711,10 @@ export default function App() {
           alignItems: "center",
           justifyContent: "center",
           padding: "20px",
-          zIndex: 9999
+          zIndex: 9999,
+          overflowY: "auto"
         }}>
-          <div className="glass-panel" style={{ maxWidth: "460px", width: "100%", padding: "26px", borderRadius: "var(--radius-lg)" }}>
+          <div className="glass-panel" style={{ maxWidth: "460px", width: "100%", maxHeight: "calc(100vh - 40px)", overflowY: "auto", padding: "26px", borderRadius: "var(--radius-lg)" }}>
             <h3 style={{ fontSize: "1.15rem", fontWeight: 800, marginBottom: "12px" }}>Record Fee Payment</h3>
             <div style={{ padding: "10px", background: "rgba(0,0,0,0.25)", borderRadius: "8px", marginBottom: "14px", fontSize: "0.85rem" }}>
               <div>Student: <strong>{selectedStudentForFee.name}</strong></div>
@@ -3748,9 +3754,10 @@ export default function App() {
           alignItems: "center",
           justifyContent: "center",
           padding: "20px",
-          zIndex: 9999
+          zIndex: 9999,
+          overflowY: "auto"
         }}>
-          <div className="glass-panel" style={{ maxWidth: "480px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)", background: "#0a0f1d" }}>
+          <div className="glass-panel" style={{ maxWidth: "480px", width: "100%", maxHeight: "calc(100vh - 40px)", overflowY: "auto", padding: "28px", borderRadius: "var(--radius-lg)", background: "#0a0f1d" }}>
             <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "12px", marginBottom: "14px" }}>
               <div>
                 <div style={{ fontSize: "1rem", fontWeight: 900, color: "#ffffff" }}>APEX EDUCATION FORUM</div>
