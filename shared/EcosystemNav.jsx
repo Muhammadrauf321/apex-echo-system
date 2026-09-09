@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { 
   getCurrentUser, 
   subscribeToAuth, 
@@ -275,8 +276,14 @@ export default function EcosystemNav({ currentApp = "website" }) {
 
   const badge = user ? getRoleBadge(user.role) : null;
 
+  const renderPortal = (children) => {
+    if (typeof document === "undefined") return null;
+    return createPortal(children, document.body);
+  };
+
   return (
-    <header className="ecosystem-nav">
+    <>
+      <header className="ecosystem-nav">
       <div className="nav-container">
         {/* Brand */}
         <a href={getAppUrl("website")} className="nav-brand">
@@ -441,11 +448,12 @@ export default function EcosystemNav({ currentApp = "website" }) {
           )}
         </div>
       </div>
+    </header>
 
       {/* ======================================================== */}
       {/* 1. FLOATING TOAST: DISPATCHED ACTIVATION EMAIL           */}
       {/* ======================================================== */}
-      {activeToastEmail && (
+      {activeToastEmail && renderPortal(
         <div style={{
           position: "fixed",
           bottom: "24px",
@@ -511,13 +519,19 @@ export default function EcosystemNav({ currentApp = "website" }) {
       {/* ======================================================== */}
       {/* 2. DRAWER: SIMULATED GMAIL OUTBOX                        */}
       {/* ======================================================== */}
-      {showOutboxDrawer && (
+      {showOutboxDrawer && renderPortal(
         <div style={{
           position: "fixed",
-          inset: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: "100vw",
+          height: "100vh",
           background: "rgba(3, 7, 18, 0.75)",
           backdropFilter: "blur(6px)",
-          zIndex: 10002,
+          WebkitBackdropFilter: "blur(6px)",
+          zIndex: 999999,
           display: "flex",
           justifyContent: "flex-end"
         }}>
@@ -642,17 +656,25 @@ export default function EcosystemNav({ currentApp = "website" }) {
       {/* ======================================================== */}
       {/* 3. MODAL: FIRST-TIME ACCOUNT ACTIVATION & PASSWORD SETUP  */}
       {/* ======================================================== */}
-      {showActivateModal && (
+      {showActivateModal && renderPortal(
         <div style={{
           position: "fixed",
-          inset: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: "100vw",
+          height: "100vh",
           background: "rgba(3, 7, 18, 0.9)",
           backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          zIndex: 10003,
-          padding: "20px"
+          zIndex: 999999,
+          padding: "20px",
+          boxSizing: "border-box",
+          overflowY: "auto"
         }}>
           <div style={{
             background: "#0b0f19",
@@ -661,7 +683,11 @@ export default function EcosystemNav({ currentApp = "website" }) {
             width: "100%",
             maxWidth: "460px",
             padding: "32px",
-            boxShadow: "0 25px 70px rgba(0,0,0,0.9)"
+            boxShadow: "0 25px 70px rgba(0,0,0,0.9)",
+            maxHeight: "calc(100vh - 40px)",
+            overflowY: "auto",
+            margin: "auto",
+            position: "relative"
           }}>
             {/* Header */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
@@ -809,26 +835,38 @@ export default function EcosystemNav({ currentApp = "website" }) {
       {/* ======================================================== */}
       {/* 4. MODAL: STANDARD SIGN IN                               */}
       {/* ======================================================== */}
-      {showLoginModal && (
+      {showLoginModal && renderPortal(
         <div style={{
           position: "fixed",
-          inset: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: "100vw",
+          height: "100vh",
           background: "rgba(3, 7, 18, 0.85)",
           backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          zIndex: 10000,
-          padding: "20px"
+          zIndex: 999999,
+          padding: "20px",
+          boxSizing: "border-box",
+          overflowY: "auto"
         }}>
           <div style={{
             background: "#0b0f19",
             border: "1px solid rgba(255, 255, 255, 0.12)",
             borderRadius: "18px",
             width: "100%",
-            maxWidth: "420px",
+            maxWidth: "430px",
             padding: "28px",
-            boxShadow: "0 25px 60px rgba(0,0,0,0.8)"
+            boxShadow: "0 25px 60px rgba(0,0,0,0.9)",
+            maxHeight: "calc(100vh - 40px)",
+            overflowY: "auto",
+            margin: "auto",
+            position: "relative"
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#ffffff" }}>
@@ -885,6 +923,34 @@ export default function EcosystemNav({ currentApp = "website" }) {
               >
                 {isSubmitting ? "Verifying..." : "Sign In"}
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginEmail("muhammadraufbaloch6@gmail.com");
+                  setLoginPassword("password123");
+                }}
+                style={{
+                  marginTop: "12px",
+                  width: "100%",
+                  padding: "9px 12px",
+                  borderRadius: "8px",
+                  background: "rgba(99, 102, 241, 0.12)",
+                  border: "1px dashed rgba(99, 102, 241, 0.4)",
+                  color: "#a5b4fc",
+                  fontSize: "0.8rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "6px",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                <ShieldCheck size={14} />
+                <span>Fill Admin Credentials (Muhammad Rauf)</span>
+              </button>
             </form>
 
             <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", marginTop: "20px", paddingTop: "14px", textAlign: "center", fontSize: "0.8rem", color: "#94a3b8" }}>
@@ -903,6 +969,6 @@ export default function EcosystemNav({ currentApp = "website" }) {
           </div>
         </div>
       )}
-    </header>
+    </>
   );
 }
