@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import EcosystemNav, { getAppUrl, openApexLoginModal } from "@shared/EcosystemNav.jsx";
-import { getCurrentUser, subscribeToAuth, createAccountInvitation, getInvitations } from "@shared/auth.js";
+import { getCurrentUser, subscribeToAuth, createAccountInvitation, getInvitations, getInvitationByEmail } from "@shared/auth.js";
+import { generateGmailComposeUrl } from "@shared/emailService.js";
 import { 
   getCourses, 
   addCourse,
@@ -450,11 +451,14 @@ export default function App() {
     setTeachers(getTeachers());
     setShowTeacherModal(false);
     const tempCode = inviteRes.success ? inviteRes.invitation.tempCode : "";
+    const isSentViaEmailJS = inviteRes?.deliveryStatus === "delivered_emailjs";
     setNewTeacherForm({ name: "", email: "", department: "IT & Web Development", phone: "" });
 
     setStatusBanner({
       type: "success",
-      message: `Activation email dispatched to ${newTeacherForm.email} with Temporary Security Code: ${tempCode}. Account pending faculty activation.`
+      message: isSentViaEmailJS
+        ? `✓ Activation email delivered directly to ${newTeacherForm.email} inbox via EmailJS! Security Code: ${tempCode}.`
+        : `Activation invitation created for ${newTeacherForm.email} (Security Code: ${tempCode}). You can also click "Send via Gmail Web" in the directory or configure EmailJS in the top bar.`
     });
   };
 
@@ -488,6 +492,7 @@ export default function App() {
     setStudents(getStudents());
     setShowEnrollStudentModal(false);
     const tempCode = inviteRes.success ? inviteRes.invitation.tempCode : "";
+    const isSentViaEmailJS = inviteRes?.deliveryStatus === "delivered_emailjs";
     setNewStudentForm({
       name: "",
       email: "",
@@ -499,7 +504,9 @@ export default function App() {
 
     setStatusBanner({
       type: "success",
-      message: `Activation email dispatched to ${newStudentForm.email} with Temporary Security Code: ${tempCode}. Student can now activate their ID.`
+      message: isSentViaEmailJS
+        ? `✓ Activation email delivered directly to ${newStudentForm.email} inbox via EmailJS! Security Code: ${tempCode}.`
+        : `Activation invitation created for ${newStudentForm.email} (Security Code: ${tempCode}). Student can now activate their ID.`
     });
   };
 
@@ -510,9 +517,12 @@ export default function App() {
       email: recipientEmail,
       role
     });
+    const isSentViaEmailJS = inviteRes?.deliveryStatus === "delivered_emailjs";
     setStatusBanner({
       type: "success",
-      message: `Activation email re-dispatched to ${recipientEmail} (Security Code: ${inviteRes.invitation?.tempCode}).`
+      message: isSentViaEmailJS
+        ? `✓ Activation email delivered directly to ${recipientEmail} inbox via EmailJS! (Security Code: ${inviteRes.invitation?.tempCode}).`
+        : `Activation invitation regenerated for ${recipientEmail} (Security Code: ${inviteRes.invitation?.tempCode}). You can also use "Send via Gmail" for 1-click delivery.`
     });
   };
 
@@ -1579,6 +1589,16 @@ export default function App() {
                     {students.map((std) => {
                       const balance = std.totalFee - std.paidFee;
                       const isPendingActivation = std.activationStatus === "pending_activation";
+                      const inv = isPendingActivation ? getInvitationByEmail(std.email) : null;
+                      const originUrl = typeof window !== "undefined" ? window.location.origin : "";
+                      const activationUrl = inv ? `${originUrl}/?activate=${inv.token}` : "";
+                      const gmailComposeLink = inv ? generateGmailComposeUrl({
+                        recipientEmail: std.email,
+                        recipientName: std.name,
+                        role: "Student",
+                        tempCode: inv.tempCode,
+                        activationUrl
+                      }) : "";
                       return (
                         <tr key={std.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                           <td style={{ padding: "16px", fontWeight: 600 }}>
@@ -1634,15 +1654,41 @@ export default function App() {
                           <td style={{ padding: "16px", textAlign: "right" }}>
                             <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
                               {isPendingActivation && std.email && (
-                                <button
-                                  onClick={() => handleResendInvite(std.email, std.name, "student")}
-                                  className="btn-secondary"
-                                  style={{ padding: "6px 10px", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#38bdf8" }}
-                                  title="Resend Activation Email"
-                                >
-                                  <RefreshCw size={12} />
-                                  <span>Resend</span>
-                                </button>
+                                <>
+                                  {gmailComposeLink && (
+                                    <a
+                                      href={gmailComposeLink}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={{
+                                        padding: "6px 8px",
+                                        borderRadius: "6px",
+                                        background: "rgba(239, 68, 68, 0.15)",
+                                        border: "1px solid rgba(239, 68, 68, 0.3)",
+                                        color: "#fca5a5",
+                                        textDecoration: "none",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "4px",
+                                        fontSize: "0.72rem",
+                                        fontWeight: 600
+                                      }}
+                                      title="Open Pre-Filled Invitation in Gmail Web"
+                                    >
+                                      <ExternalLink size={12} />
+                                      <span>Gmail</span>
+                                    </a>
+                                  )}
+                                  <button
+                                    onClick={() => handleResendInvite(std.email, std.name, "student")}
+                                    className="btn-secondary"
+                                    style={{ padding: "6px 10px", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#38bdf8" }}
+                                    title="Resend Activation Email (EmailJS)"
+                                  >
+                                    <RefreshCw size={12} />
+                                    <span>Resend</span>
+                                  </button>
+                                </>
                               )}
 
                               {balance > 0 ? (
@@ -1723,6 +1769,17 @@ export default function App() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
                 {teachers.map(t => {
                   const isPending = t.status === "pending_activation";
+                  const inv = isPending ? getInvitationByEmail(t.email) : null;
+                  const originUrl = typeof window !== "undefined" ? window.location.origin : "";
+                  const activationUrl = inv ? `${originUrl}/?activate=${inv.token}` : "";
+                  const gmailComposeLink = inv ? generateGmailComposeUrl({
+                    recipientEmail: t.email,
+                    recipientName: t.name,
+                    role: "Instructor",
+                    tempCode: inv.tempCode,
+                    activationUrl
+                  }) : "";
+
                   return (
                     <div key={t.id} className="glass-panel" style={{ padding: "18px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                       <div>
@@ -1757,15 +1814,45 @@ export default function App() {
                       </div>
 
                       {isPending && (
-                        <div style={{ marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px", display: "flex", justifyContent: "flex-end" }}>
-                          <button
-                            onClick={() => handleResendInvite(t.email, t.name, "instructor")}
-                            className="btn-secondary"
-                            style={{ padding: "5px 12px", fontSize: "0.76rem", display: "inline-flex", alignItems: "center", gap: "6px", color: "#38bdf8" }}
-                          >
-                            <RefreshCw size={12} />
-                            <span>Resend Activation Email</span>
-                          </button>
+                        <div style={{ marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                            Code: <strong style={{ color: "#38bdf8" }}>{inv?.tempCode || "Generated"}</strong>
+                          </span>
+                          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                            {gmailComposeLink && (
+                              <a
+                                href={gmailComposeLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  padding: "5px 10px",
+                                  fontSize: "0.74rem",
+                                  borderRadius: "6px",
+                                  background: "rgba(239, 68, 68, 0.15)",
+                                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                                  color: "#fca5a5",
+                                  textDecoration: "none",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: "4px",
+                                  fontWeight: 600
+                                }}
+                                title="Open Pre-Filled Invitation in Gmail Web"
+                              >
+                                <ExternalLink size={12} />
+                                <span>Send via Gmail</span>
+                              </a>
+                            )}
+                            <button
+                              onClick={() => handleResendInvite(t.email, t.name, "instructor")}
+                              className="btn-secondary"
+                              style={{ padding: "5px 10px", fontSize: "0.74rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#38bdf8" }}
+                              title="Resend Activation Email (EmailJS)"
+                            >
+                              <RefreshCw size={12} />
+                              <span>Resend</span>
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

@@ -26,6 +26,7 @@
   "author": "Muhammad Rauf",
   "license": "MIT",
   "dependencies": {
+    "@emailjs/browser": "^4.4.1",
     "canvas-confetti": "^1.9.4",
     "firebase": "^12.10.0",
     "lucide-react": "^1.16.0",

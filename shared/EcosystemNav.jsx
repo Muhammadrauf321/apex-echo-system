@@ -8,7 +8,8 @@ import {
   getInvitationByToken,
   getInvitationByCodeAndEmail,
   activateAccountWithPassword,
-  getDispatchedEmails
+  getDispatchedEmails,
+  saveDispatchedEmails
 } from "./auth.js";
 import { ROLES, ROLE_LABELS } from "./constants.js";
 import confetti from "canvas-confetti";
@@ -29,8 +30,17 @@ import {
   Check,
   ShieldCheck,
   Sparkles,
-  Users
+  Users,
+  Settings,
+  Send,
+  RefreshCw
 } from "lucide-react";
+import {
+  getEmailJSConfig,
+  saveEmailJSConfig,
+  sendActivationEmail,
+  generateGmailComposeUrl
+} from "./emailService.js";
 
 // Universal App URL Resolver: Works seamlessly on both local development and production web URLs
 export function getAppUrl(appId) {
@@ -84,6 +94,12 @@ export default function EcosystemNav({ currentApp = "website" }) {
   const [activeToastEmail, setActiveToastEmail] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
+  // EmailJS Configuration State
+  const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
+  const [emailConfig, setEmailConfig] = useState(getEmailJSConfig());
+  const [isSendingLiveEmail, setIsSendingLiveEmail] = useState(null);
+  const [emailConfigSaveMessage, setEmailConfigSaveMessage] = useState("");
+
   // Sync Auth and check URL activation token on mount
   useEffect(() => {
     const unsubAuth = subscribeToAuth((updatedUser) => {
@@ -116,13 +132,61 @@ export default function EcosystemNav({ currentApp = "website" }) {
     };
     window.addEventListener("apex_emails_changed", handleEmailsUpdated);
 
+    const handleConfigUpdated = (e) => {
+      setEmailConfig(e.detail || getEmailJSConfig());
+    };
+    window.addEventListener("apex_emailjs_config_changed", handleConfigUpdated);
+
     return () => {
       unsubAuth();
       window.removeEventListener("apex_open_login", handleOpenLogin);
       window.removeEventListener("apex_email_dispatched", handleEmailDispatched);
       window.removeEventListener("apex_emails_changed", handleEmailsUpdated);
+      window.removeEventListener("apex_emailjs_config_changed", handleConfigUpdated);
     };
   }, []);
+
+  const handleSaveEmailConfig = (e) => {
+    e.preventDefault();
+    saveEmailJSConfig(emailConfig);
+    setEmailConfigSaveMessage("EmailJS configuration saved successfully!");
+    setTimeout(() => {
+      setEmailConfigSaveMessage("");
+      setShowEmailConfigModal(false);
+    }, 1500);
+  };
+
+  const handleSendLiveEmail = async (mail) => {
+    setIsSendingLiveEmail(mail.id);
+    const res = await sendActivationEmail({
+      recipientEmail: mail.recipientEmail,
+      recipientName: mail.recipientName,
+      role: mail.role,
+      activationUrl: mail.activationUrl,
+      tempCode: mail.tempCode
+    });
+    setIsSendingLiveEmail(null);
+
+    const current = getDispatchedEmails();
+    const updated = current.map(m => {
+      if (m.id === mail.id) {
+        return {
+          ...m,
+          deliveryStatus: res.success ? "delivered_emailjs" : "failed_emailjs",
+          deliveryError: res.error || null
+        };
+      }
+      return m;
+    });
+    saveDispatchedEmails(updated);
+    setDispatchedEmails(updated);
+
+    if (res.success) {
+      confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
+    } else {
+      alert(`EmailJS Notice: ${res.error || "Please configure your EmailJS credentials."}`);
+    }
+  };
 
   // Auto-dismiss email toast
   useEffect(() => {
@@ -490,18 +554,29 @@ export default function EcosystemNav({ currentApp = "website" }) {
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
-            <button
-              onClick={() => {
-                handleOpenActivationByToken(activeToastEmail.token);
-                setActiveToastEmail(null);
+          <div style={{ display: "flex", gap: "8px", marginTop: "4px", flexWrap: "wrap" }}>
+            <a
+              href={activeToastEmail.gmailComposeUrl || generateGmailComposeUrl(activeToastEmail)}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                flex: 1,
+                padding: "7px 12px",
+                fontSize: "0.8rem",
+                background: "linear-gradient(135deg, #ea4335, #c5221f)",
+                color: "#ffffff",
+                borderRadius: "8px",
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "6px",
+                fontWeight: 700
               }}
-              className="btn-primary"
-              style={{ flex: 1, padding: "7px 12px", fontSize: "0.8rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
             >
-              <Sparkles size={14} />
-              <span>Activate ID Now</span>
-            </button>
+              <Send size={13} />
+              <span>Send via Gmail</span>
+            </a>
             <button
               onClick={() => {
                 setShowOutboxDrawer(true);
@@ -510,7 +585,7 @@ export default function EcosystemNav({ currentApp = "website" }) {
               className="btn-secondary"
               style={{ padding: "7px 12px", fontSize: "0.8rem" }}
             >
-              View Email
+              View Log
             </button>
           </div>
         </div>
@@ -551,102 +626,199 @@ export default function EcosystemNav({ currentApp = "website" }) {
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <Mail size={18} color="#38bdf8" />
                   <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#ffffff" }}>
-                    Dispatched Mail Log (Gmail Dispatcher)
+                    Dispatched Invitations & Inbox Delivery
                   </h3>
                 </div>
                 <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "2px" }}>
-                  Activation invitations sent to Teachers and Students
+                  Automated EmailJS sending & Gmail dispatch log
                 </div>
               </div>
-              <button
-                onClick={() => setShowOutboxDrawer(false)}
-                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
-              >
-                <X size={20} />
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  onClick={() => setShowEmailConfigModal(true)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "6px 10px",
+                    borderRadius: "8px",
+                    background: "rgba(99, 102, 241, 0.15)",
+                    border: "1px solid rgba(99, 102, 241, 0.3)",
+                    color: "#a5b4fc",
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    cursor: "pointer"
+                  }}
+                  title="Configure EmailJS Keys for Automatic Inbox Sending"
+                >
+                  <Settings size={14} />
+                  <span>EmailJS Config</span>
+                </button>
+                <button
+                  onClick={() => setShowOutboxDrawer(false)}
+                  style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* EmailJS Status Banner */}
+            <div style={{ padding: "12px 24px 0 24px" }}>
+              <div style={{
+                background: emailConfig.isEnabled && emailConfig.serviceId ? "rgba(16, 185, 129, 0.1)" : "rgba(245, 158, 11, 0.1)",
+                border: emailConfig.isEnabled && emailConfig.serviceId ? "1px solid rgba(16, 185, 129, 0.3)" : "1px solid rgba(245, 158, 11, 0.3)",
+                borderRadius: "10px",
+                padding: "10px 14px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "10px"
+              }}>
+                <div>
+                  <div style={{ fontSize: "0.82rem", fontWeight: 700, color: emailConfig.isEnabled && emailConfig.serviceId ? "#34d399" : "#fbbf24" }}>
+                    {emailConfig.isEnabled && emailConfig.serviceId ? "● Automated Inbox Delivery Active" : "⚠️ EmailJS Keys Needed for Auto-Inbox"}
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                    {emailConfig.isEnabled && emailConfig.serviceId
+                      ? "Emails dispatch automatically via EmailJS directly to faculty inboxes."
+                      : "Click 'Configure' to connect your EmailJS credentials or use 'Open in Gmail Web'."}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowEmailConfigModal(true)}
+                  className="btn-secondary"
+                  style={{ padding: "5px 10px", fontSize: "0.72rem", whiteSpace: "nowrap" }}
+                >
+                  Configure
+                </button>
+              </div>
             </div>
 
             {/* Body */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
               {dispatchedEmails.length === 0 ? (
                 <div style={{ textAlign: "center", color: "#64748b", padding: "60px 20px" }}>
                   <Mail size={42} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
                   <div style={{ fontSize: "1rem", fontWeight: 700 }}>No Emails Dispatched Yet</div>
                   <div style={{ fontSize: "0.82rem", marginTop: "4px" }}>
-                    When Admin registers a teacher or enrolls a student with their Gmail, the activation email will appear here.
+                    When Admin registers a teacher or enrolls a student with their Gmail, the activation invitation will appear here.
                   </div>
                 </div>
               ) : (
-                dispatchedEmails.map((mail) => (
-                  <div
-                    key={mail.id}
-                    style={{
-                      background: "rgba(255, 255, 255, 0.03)",
-                      border: "1px solid rgba(255, 255, 255, 0.08)",
-                      borderRadius: "12px",
-                      padding: "16px"
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.92rem", color: "#ffffff" }}>
-                          To: {mail.recipientName} ({mail.recipientEmail})
+                dispatchedEmails.map((mail) => {
+                  const isDelivered = mail.deliveryStatus === "delivered_emailjs";
+                  const isFailed = mail.deliveryStatus === "failed_emailjs";
+                  const composeLink = mail.gmailComposeUrl || generateGmailComposeUrl(mail);
+
+                  return (
+                    <div
+                      key={mail.id}
+                      style={{
+                        background: "rgba(255, 255, 255, 0.03)",
+                        border: "1px solid rgba(255, 255, 255, 0.08)",
+                        borderRadius: "12px",
+                        padding: "16px"
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: "0.92rem", color: "#ffffff", display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span>To: {mail.recipientName} ({mail.recipientEmail})</span>
+                          </div>
+                          <div style={{ fontSize: "0.76rem", color: "#38bdf8", marginTop: "2px" }}>
+                            Role: {mail.role} • Subject: {mail.subject}
+                          </div>
                         </div>
-                        <div style={{ fontSize: "0.76rem", color: "#38bdf8" }}>
-                          Role: {mail.role} | Subject: {mail.subject}
+                        <div style={{ textAlign: "right" }}>
+                          <span style={{ fontSize: "0.72rem", color: "#94a3b8", display: "block" }}>
+                            {mail.timestamp}
+                          </span>
+                          <span style={{
+                            fontSize: "0.68rem",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            fontWeight: 700,
+                            display: "inline-block",
+                            marginTop: "3px",
+                            background: isDelivered ? "rgba(16, 185, 129, 0.15)" : isFailed ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
+                            color: isDelivered ? "#34d399" : isFailed ? "#f87171" : "#fbbf24",
+                            border: `1px solid ${isDelivered ? "rgba(16, 185, 129, 0.3)" : isFailed ? "rgba(239, 68, 68, 0.3)" : "rgba(245, 158, 11, 0.3)"}`
+                          }}>
+                            {isDelivered ? "✓ Inbox Sent (EmailJS)" : isFailed ? "✕ Delivery Failed" : "● Stored in Portal"}
+                          </span>
                         </div>
                       </div>
-                      <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                        {mail.timestamp}
-                      </span>
-                    </div>
 
-                    <div style={{
-                      background: "rgba(0, 0, 0, 0.4)",
-                      borderRadius: "8px",
-                      padding: "12px",
-                      margin: "10px 0",
-                      fontSize: "0.82rem",
-                      color: "#cbd5e1",
-                      border: "1px dashed rgba(255, 255, 255, 0.15)"
-                    }}>
-                      <div>{mail.bodyPreview}</div>
-                      <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ color: "#94a3b8" }}>Temporary Security Code:</span>
-                        <code style={{ background: "rgba(234, 179, 8, 0.2)", color: "#facc15", padding: "2px 8px", borderRadius: "4px", fontWeight: 800 }}>
-                          {mail.tempCode}
-                        </code>
+                      <div style={{
+                        background: "rgba(0, 0, 0, 0.4)",
+                        borderRadius: "8px",
+                        padding: "12px",
+                        margin: "10px 0",
+                        fontSize: "0.82rem",
+                        color: "#cbd5e1",
+                        border: "1px dashed rgba(255, 255, 255, 0.15)"
+                      }}>
+                        <div>{mail.bodyPreview}</div>
+                        <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ color: "#94a3b8" }}>Temporary Security Code:</span>
+                          <code style={{ background: "rgba(234, 179, 8, 0.2)", color: "#facc15", padding: "2px 8px", borderRadius: "4px", fontWeight: 800 }}>
+                            {mail.tempCode}
+                          </code>
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(mail.activationUrl);
+                            setCopiedId(mail.id);
+                            setTimeout(() => setCopiedId(null), 2000);
+                          }}
+                          className="btn-secondary"
+                          style={{ padding: "6px 10px", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "4px" }}
+                        >
+                          {copiedId === mail.id ? <Check size={13} color="#10b981" /> : <Copy size={13} />}
+                          <span>{copiedId === mail.id ? "Copied" : "Copy Link"}</span>
+                        </button>
+
+                        <a
+                          href={composeLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            padding: "6px 12px",
+                            fontSize: "0.78rem",
+                            background: "rgba(234, 67, 53, 0.15)",
+                            border: "1px solid rgba(234, 67, 53, 0.4)",
+                            color: "#f87171",
+                            borderRadius: "8px",
+                            textDecoration: "none",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            fontWeight: 600
+                          }}
+                          title="Open Gmail Web compose with pre-filled invitation"
+                        >
+                          <Send size={13} />
+                          <span>Open in Gmail</span>
+                        </a>
+
+                        <button
+                          onClick={() => handleSendLiveEmail(mail)}
+                          disabled={isSendingLiveEmail === mail.id}
+                          className="btn-primary"
+                          style={{ padding: "6px 12px", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "5px" }}
+                          title="Send directly to real inbox via EmailJS"
+                        >
+                          <RefreshCw size={13} className={isSendingLiveEmail === mail.id ? "animate-spin" : ""} />
+                          <span>{isSendingLiveEmail === mail.id ? "Sending..." : "Send via EmailJS"}</span>
+                        </button>
                       </div>
                     </div>
-
-                    <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(mail.activationUrl);
-                          setCopiedId(mail.id);
-                          setTimeout(() => setCopiedId(null), 2000);
-                        }}
-                        className="btn-secondary"
-                        style={{ padding: "6px 12px", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "4px" }}
-                      >
-                        {copiedId === mail.id ? <Check size={14} color="#10b981" /> : <Copy size={14} />}
-                        <span>{copiedId === mail.id ? "Link Copied" : "Copy Link"}</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          handleOpenActivationByToken(mail.token);
-                          setShowOutboxDrawer(false);
-                        }}
-                        className="btn-primary"
-                        style={{ padding: "6px 14px", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "6px" }}
-                      >
-                        <ExternalLink size={14} />
-                        <span>Simulate User Activation</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
@@ -966,6 +1138,157 @@ export default function EcosystemNav({ currentApp = "website" }) {
                 Activate ID with Security Code
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 5. MODAL: EMAILJS CONFIGURATION (FOR REAL INBOX DELIVERY)*/}
+      {/* ======================================================== */}
+      {showEmailConfigModal && renderPortal(
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: "100vw",
+          height: "100vh",
+          background: "rgba(3, 7, 18, 0.85)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 999999,
+          padding: "20px",
+          boxSizing: "border-box",
+          overflowY: "auto"
+        }}>
+          <div style={{
+            background: "#0b0f19",
+            border: "1px solid rgba(99, 102, 241, 0.3)",
+            borderRadius: "18px",
+            width: "100%",
+            maxWidth: "480px",
+            padding: "28px",
+            boxShadow: "0 25px 60px rgba(0,0,0,0.9)",
+            maxHeight: "calc(100vh - 40px)",
+            overflowY: "auto",
+            margin: "auto",
+            position: "relative"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Settings size={20} color="#818cf8" />
+                <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#ffffff" }}>
+                  EmailJS Automated Delivery
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowEmailConfigModal(false)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{
+              background: "rgba(99, 102, 241, 0.08)",
+              border: "1px solid rgba(99, 102, 241, 0.25)",
+              borderRadius: "10px",
+              padding: "12px 14px",
+              fontSize: "0.8rem",
+              color: "#c7d2fe",
+              lineHeight: 1.5,
+              marginBottom: "18px"
+            }}>
+              Connect your free <a href="https://www.emailjs.com" target="_blank" rel="noreferrer" style={{ color: "#38bdf8", fontWeight: 700 }}>EmailJS</a> account to automatically dispatch activation links directly into faculty & student Gmail inboxes without opening mail clients.
+            </div>
+
+            {emailConfigSaveMessage && (
+              <div style={{ padding: "10px 12px", background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: "8px", color: "#34d399", fontSize: "0.82rem", marginBottom: "16px" }}>
+                {emailConfigSaveMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEmailConfig}>
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "6px", color: "#cbd5e1" }}>
+                  EmailJS Service ID *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. service_xxxxxxx"
+                  value={emailConfig.serviceId}
+                  onChange={(e) => setEmailConfig({ ...emailConfig, serviceId: e.target.value })}
+                  style={{ width: "100%", padding: "10px", background: "#060911", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", color: "#ffffff", fontSize: "0.85rem" }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "6px", color: "#cbd5e1" }}>
+                  EmailJS Template ID *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. template_xxxxxxx"
+                  value={emailConfig.templateId}
+                  onChange={(e) => setEmailConfig({ ...emailConfig, templateId: e.target.value })}
+                  style={{ width: "100%", padding: "10px", background: "#060911", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", color: "#ffffff", fontSize: "0.85rem" }}
+                />
+                <div style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: "4px" }}>
+                  Template variables provided: <code>{"{{to_name}}"}</code>, <code>{"{{to_email}}"}</code>, <code>{"{{temp_code}}"}</code>, <code>{"{{activation_url}}"}</code>, <code>{"{{role}}"}</code>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "6px", color: "#cbd5e1" }}>
+                  EmailJS Public Key *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. user_xxxxxxxxx or public key"
+                  value={emailConfig.publicKey}
+                  onChange={(e) => setEmailConfig({ ...emailConfig, publicKey: e.target.value })}
+                  style={{ width: "100%", padding: "10px", background: "#060911", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", color: "#ffffff", fontSize: "0.85rem" }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
+                <input
+                  type="checkbox"
+                  id="emailjs_enable"
+                  checked={emailConfig.isEnabled}
+                  onChange={(e) => setEmailConfig({ ...emailConfig, isEnabled: e.target.checked })}
+                  style={{ width: "16px", height: "16px", accentColor: "#6366f1" }}
+                />
+                <label htmlFor="emailjs_enable" style={{ fontSize: "0.84rem", color: "#ffffff", cursor: "pointer", fontWeight: 600 }}>
+                  Enable automatic background inbox delivery
+                </label>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowEmailConfigModal(false)}
+                  className="btn-secondary"
+                  style={{ padding: "9px 14px", fontSize: "0.84rem" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  style={{ padding: "9px 18px", fontSize: "0.84rem", fontWeight: 700 }}
+                >
+                  Save EmailJS Credentials
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

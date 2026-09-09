@@ -7,6 +7,7 @@ import {
   onAuthStateChanged 
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { sendActivationEmail, generateGmailComposeUrl } from "./emailService.js";
 
 const CURRENT_USER_KEY = "apex_current_user";
 const ACCOUNTS_KEY = "apex_registered_accounts";
@@ -328,7 +329,43 @@ export async function createAccountInvitation({ name, email, role, department = 
 
   // Construct official Apex Dispatch Email
   const roleName = role === "instructor" ? "Teaching Faculty" : "Student";
-  const activationUrl = `${window.location.origin}/?activate=${token}`;
+  const activationUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/?activate=${token}`
+    : `https://apex-education-forum.web.app/?activate=${token}`;
+
+  const gmailComposeUrl = generateGmailComposeUrl({
+    recipientEmail: cleanEmail,
+    recipientName: name.trim(),
+    role: roleName,
+    activationUrl,
+    tempCode
+  });
+
+  // Attempt real EmailJS dispatch in the background
+  let deliveryStatus = "pending";
+  let deliveryError = null;
+
+  try {
+    const emailRes = await sendActivationEmail({
+      recipientEmail: cleanEmail,
+      recipientName: name.trim(),
+      role: roleName,
+      activationUrl,
+      tempCode
+    });
+    if (emailRes.success) {
+      deliveryStatus = "delivered_emailjs";
+    } else if (emailRes.unconfigured) {
+      deliveryStatus = "pending_emailjs_config";
+      deliveryError = emailRes.error;
+    } else {
+      deliveryStatus = "failed_emailjs";
+      deliveryError = emailRes.error;
+    }
+  } catch (e) {
+    deliveryStatus = "failed_emailjs";
+    deliveryError = e?.message || "Failed to dispatch via EmailJS";
+  }
 
   const emailObject = {
     id: `mail_${Date.now()}`,
@@ -339,6 +376,9 @@ export async function createAccountInvitation({ name, email, role, department = 
     tempCode,
     token,
     activationUrl,
+    gmailComposeUrl,
+    deliveryStatus,
+    deliveryError,
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     bodyPreview: `Dear ${name}, Admin has enrolled you as ${roleName}. Please use temporary security code ${tempCode} or the link below to set your permanent password.`,
@@ -351,7 +391,22 @@ export async function createAccountInvitation({ name, email, role, department = 
   // Dispatch real-time event across apps
   window.dispatchEvent(new CustomEvent("apex_email_dispatched", { detail: emailObject }));
 
-  return { success: true, invitation, email: emailObject };
+  return { 
+    success: true, 
+    invitation, 
+    email: emailObject, 
+    deliveryStatus, 
+    deliveryError, 
+    gmailComposeUrl 
+  };
+}
+
+// Get Invitation by Email
+export function getInvitationByEmail(email) {
+  if (!email) return null;
+  const cleanEmail = email.trim().toLowerCase();
+  const invitations = getInvitations();
+  return invitations.find(i => i.email.toLowerCase() === cleanEmail) || null;
 }
 
 // Get Invitation by Token
