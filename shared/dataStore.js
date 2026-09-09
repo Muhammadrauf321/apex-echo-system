@@ -85,8 +85,71 @@ initLocalData();
 
 // --- Courses ---
 export function getCourses() {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") {
+    return SEED_COURSES;
+  }
   const data = localStorage.getItem(STORAGE_KEYS.COURSES);
   return data ? JSON.parse(data) : SEED_COURSES;
+}
+
+export function addCourse(courseData) {
+  const courses = getCourses();
+  const slugId = courseData.title
+    ? courseData.title.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")
+    : `crs_${Date.now()}`;
+  const courseId = `crs_${slugId}_${Date.now().toString(36)}`;
+  
+  const newCourse = {
+    id: courseId,
+    title: courseData.title || "Untitled Course",
+    category: courseData.category || "Information Technology",
+    tagline: courseData.tagline || "",
+    duration: courseData.duration || "3 Months (12 Weeks)",
+    sessionsPerWeek: courseData.sessionsPerWeek || "4 Days / Week",
+    fee: Number(courseData.fee) || 20000,
+    installments: Number(courseData.installments) || 2,
+    level: courseData.level || "Beginner to Advanced",
+    instructorName: courseData.instructorName || "To be assigned",
+    instructorRole: courseData.instructorRole || "Faculty Instructor",
+    rating: 5.0,
+    reviewsCount: 0,
+    badge: courseData.badge || "New Course",
+    icon: courseData.icon || "BookOpen",
+    modules: courseData.modules && courseData.modules.length > 0 ? courseData.modules : [
+      "Core Foundations & Program Overview",
+      "Applied Practical Projects & Practical Labs",
+      "Industry Capstone & Final Evaluation"
+    ],
+    prerequisites: courseData.prerequisites || "Basic literacy and logical thinking.",
+    createdAt: new Date().toISOString()
+  };
+
+  const updated = [newCourse, ...courses];
+  localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(updated));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("apex_courses_changed", { detail: updated }));
+  }
+  return newCourse;
+}
+
+export function updateCourse(id, updatedFields) {
+  const courses = getCourses();
+  const updated = courses.map(c => c.id === id ? { ...c, ...updatedFields } : c);
+  localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(updated));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("apex_courses_changed", { detail: updated }));
+  }
+  return updated;
+}
+
+export function deleteCourse(id) {
+  const courses = getCourses();
+  const updated = courses.filter(c => c.id !== id);
+  localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(updated));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("apex_courses_changed", { detail: updated }));
+  }
+  return updated;
 }
 
 // --- Teachers / Faculty Management (Registered by Admin) ---

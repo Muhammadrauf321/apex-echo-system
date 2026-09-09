@@ -3,6 +3,9 @@ import EcosystemNav, { getAppUrl, openApexLoginModal } from "@shared/EcosystemNa
 import { getCurrentUser, subscribeToAuth, createAccountInvitation, getInvitations } from "@shared/auth.js";
 import { 
   getCourses, 
+  addCourse,
+  updateCourse,
+  deleteCourse,
   getBatches, 
   createBatch, 
   getInquiries, 
@@ -73,8 +76,33 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(isAdmin ? "overview" : isTeacher ? "exams" : "my_schedule");
 
   // Real Dynamic Data (Zero Mock / Zero Seed Data)
-  const [courses] = useState(getCourses());
+  const [courses, setCourses] = useState(getCourses());
   const [batches, setBatches] = useState(getBatches());
+
+  // Course Management State (Admin Feature)
+  const [showCourseModal, setShowCourseModal] = useState(false);
+  const [editingCourse, setEditingCourse] = useState(null);
+  const [searchTermCourses, setSearchTermCourses] = useState("");
+  const [filterCourseCategory, setFilterCourseCategory] = useState("all");
+  const [expandedSyllabusId, setExpandedSyllabusId] = useState(null);
+  const [newModuleInput, setNewModuleInput] = useState("");
+  const [courseForm, setCourseForm] = useState({
+    title: "",
+    category: "Information Technology",
+    tagline: "",
+    duration: "3 Months (12 Weeks)",
+    sessionsPerWeek: "4 Days / Week (Daily 2 hrs)",
+    fee: 25000,
+    installments: 2,
+    level: "Beginner to Advanced",
+    badge: "New Course",
+    prerequisites: "Basic literacy and logical thinking",
+    modules: [
+      "Core Foundations & Key Principles",
+      "Hands-on Lab Projects & Practical Workshops",
+      "Real-world Industry Capstone Project"
+    ]
+  });
   const [inquiries, setInquiries] = useState(getInquiries());
   const [exams, setExams] = useState(getExams());
   const [teachers, setTeachers] = useState(getTeachers());
@@ -208,6 +236,7 @@ export default function App() {
 
   // Sync data store listeners
   useEffect(() => {
+    const handleCourses = () => setCourses(getCourses());
     const handleInq = () => setInquiries(getInquiries());
     const handleBatches = () => setBatches(getBatches());
     const handleExams = () => setExams(getExams());
@@ -215,6 +244,7 @@ export default function App() {
     const handleStudents = () => setStudents(getStudents());
     const handleCerts = () => setCertificates(getCertificates());
 
+    window.addEventListener("apex_courses_changed", handleCourses);
     window.addEventListener("apex_inquiries_changed", handleInq);
     window.addEventListener("apex_batches_changed", handleBatches);
     window.addEventListener("apex_exams_changed", handleExams);
@@ -223,6 +253,7 @@ export default function App() {
     window.addEventListener("apex_certificates_changed", handleCerts);
 
     return () => {
+      window.removeEventListener("apex_courses_changed", handleCourses);
       window.removeEventListener("apex_inquiries_changed", handleInq);
       window.removeEventListener("apex_batches_changed", handleBatches);
       window.removeEventListener("apex_exams_changed", handleExams);
@@ -239,6 +270,118 @@ export default function App() {
       return () => clearTimeout(t);
     }
   }, [statusBanner]);
+
+  // Course Management Handlers (Admin)
+  const handleOpenCreateCourseModal = () => {
+    setEditingCourse(null);
+    setCourseForm({
+      title: "",
+      category: "Information Technology",
+      tagline: "",
+      duration: "3 Months (12 Weeks)",
+      sessionsPerWeek: "4 Days / Week (Daily 2 hrs)",
+      fee: 25000,
+      installments: 2,
+      level: "Beginner to Advanced",
+      badge: "New Course",
+      prerequisites: "Basic literacy and logical thinking",
+      modules: [
+        "Module 1: Foundations & Core Principles",
+        "Module 2: Practical Projects & Lab Exercises",
+        "Module 3: Advanced Applications & Industry Capstone"
+      ]
+    });
+    setNewModuleInput("");
+    setShowCourseModal(true);
+  };
+
+  const handleOpenEditCourseModal = (course) => {
+    setEditingCourse(course);
+    setCourseForm({
+      title: course.title || "",
+      category: course.category || "Information Technology",
+      tagline: course.tagline || "",
+      duration: course.duration || "3 Months (12 Weeks)",
+      sessionsPerWeek: course.sessionsPerWeek || "4 Days / Week",
+      fee: course.fee || 20000,
+      installments: course.installments || 2,
+      level: course.level || "Beginner to Advanced",
+      badge: course.badge || "New Course",
+      prerequisites: course.prerequisites || "",
+      modules: course.modules && course.modules.length > 0 ? [...course.modules] : [
+        "Core Program Syllabus"
+      ]
+    });
+    setNewModuleInput("");
+    setShowCourseModal(true);
+  };
+
+  const handleAddModuleToForm = () => {
+    if (!newModuleInput.trim()) return;
+    setCourseForm(prev => ({
+      ...prev,
+      modules: [...prev.modules, newModuleInput.trim()]
+    }));
+    setNewModuleInput("");
+  };
+
+  const handleRemoveModuleFromForm = (index) => {
+    setCourseForm(prev => ({
+      ...prev,
+      modules: prev.modules.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleSaveCourseSubmit = (e) => {
+    e.preventDefault();
+    if (!courseForm.title.trim()) return;
+
+    if (editingCourse) {
+      updateCourse(editingCourse.id, {
+        ...courseForm,
+        fee: Number(courseForm.fee),
+        installments: Number(courseForm.installments)
+      });
+      setCourses(getCourses());
+      setStatusBanner({
+        type: "success",
+        message: `Course "${courseForm.title}" updated successfully!`
+      });
+    } else {
+      addCourse({
+        ...courseForm,
+        fee: Number(courseForm.fee),
+        installments: Number(courseForm.installments)
+      });
+      setCourses(getCourses());
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      setStatusBanner({
+        type: "success",
+        message: `New Course "${courseForm.title}" published to Apex Ecosystem!`
+      });
+    }
+    setShowCourseModal(false);
+  };
+
+  const handleDeleteCourse = (courseId, courseTitle) => {
+    if (window.confirm(`Are you sure you want to delete "${courseTitle}"? This will remove it from all course catalogs.`)) {
+      deleteCourse(courseId);
+      setCourses(getCourses());
+      setStatusBanner({
+        type: "warning",
+        message: `Course "${courseTitle}" has been deleted.`
+      });
+    }
+  };
+
+  const filteredCourseList = courses.filter(c => {
+    const matchesCategory = filterCourseCategory === "all" || c.category === filterCourseCategory;
+    const matchesSearch = !searchTermCourses || 
+      c.title?.toLowerCase().includes(searchTermCourses.toLowerCase()) ||
+      c.tagline?.toLowerCase().includes(searchTermCourses.toLowerCase()) ||
+      c.category?.toLowerCase().includes(searchTermCourses.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   // Handle Admission Inquiry Approval with Gmail Activation Dispatch
   const handleApproveInquiry = async (inq) => {
@@ -581,6 +724,7 @@ export default function App() {
   if (isAdmin) {
     roleTabs.push(
       { id: "overview", label: "Executive Overview", icon: LayoutDashboard },
+      { id: "courses", label: "Course Curriculum", icon: BookOpen, badge: courses.length },
       { id: "batches", label: "Batches & Timetables", icon: Calendar },
       { id: "fees", label: "Admissions & Fees", icon: DollarSign },
       { id: "exams", label: "Examination Master Control", icon: FileText, badge: exams.filter(e => e.status === EXAM_STATUS.PENDING_ADMIN).length },
@@ -976,6 +1120,341 @@ export default function App() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* COURSE CURRICULUM & OFFERINGS MANAGEMENT (ADMIN ONLY)     */}
+        {/* ======================================================== */}
+        {activeTab === "courses" && isAdmin && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px", flexWrap: "wrap", gap: "16px" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+                  <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "rgba(99, 102, 241, 0.15)", color: "#818cf8", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <BookOpen size={20} />
+                  </div>
+                  <h2 style={{ fontSize: "1.4rem", fontWeight: 800, color: "#ffffff" }}>
+                    Course Curriculum & Academic Programs
+                  </h2>
+                </div>
+                <p style={{ color: "var(--text-muted)", fontSize: "0.88rem" }}>
+                  Create and publish training programs, syllabus modules, fee installments, and certifications across the Apex Ecosystem.
+                </p>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  onClick={handleOpenCreateCourseModal}
+                  className="btn-primary"
+                  style={{ fontSize: "0.88rem", padding: "10px 18px", display: "flex", alignItems: "center", gap: "8px" }}
+                >
+                  <Plus size={17} />
+                  <span>Create New Course</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Metrics Bar */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "28px" }}>
+              <div className="glass-panel" style={{ padding: "18px 22px" }}>
+                <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 600, marginBottom: "6px" }}>Total Active Programs</div>
+                <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "#ffffff" }}>{courses.length}</div>
+                <div style={{ fontSize: "0.75rem", color: "#38bdf8", marginTop: "2px" }}>Available for Admissions</div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: "18px 22px" }}>
+                <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 600, marginBottom: "6px" }}>IT & Computer Tracks</div>
+                <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "#818cf8" }}>
+                  {courses.filter(c => c.category?.toLowerCase().includes("it") || c.category?.toLowerCase().includes("technology")).length}
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "2px" }}>Software & AI Labs</div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: "18px 22px" }}>
+                <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 600, marginBottom: "6px" }}>Language & Fluency</div>
+                <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "#34d399" }}>
+                  {courses.filter(c => c.category?.toLowerCase().includes("language") || c.category?.toLowerCase().includes("english")).length}
+                </div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "2px" }}>Spoken & IELTS Courses</div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: "18px 22px" }}>
+                <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 600, marginBottom: "6px" }}>Active Batches Linked</div>
+                <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "#fbbf24" }}>{batches.length}</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "2px" }}>Campus Schedule Slots</div>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "14px", marginBottom: "20px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                {[
+                  { id: "all", label: "All Curricula" },
+                  { id: "Information Technology", label: "IT & Software" },
+                  { id: "Language & Fluency", label: "Language & IELTS" },
+                  { id: "Professional & Management", label: "Professional" }
+                ].map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setFilterCourseCategory(cat.id)}
+                    style={{
+                      padding: "7px 14px",
+                      borderRadius: "8px",
+                      border: filterCourseCategory === cat.id ? "1px solid #6366f1" : "1px solid var(--border-subtle)",
+                      background: filterCourseCategory === cat.id ? "rgba(99, 102, 241, 0.2)" : "rgba(255, 255, 255, 0.03)",
+                      color: filterCourseCategory === cat.id ? "#ffffff" : "var(--text-muted)",
+                      fontSize: "0.82rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "all 0.2s"
+                    }}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ position: "relative", minWidth: "260px" }}>
+                <Search size={15} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-muted)" }} />
+                <input
+                  type="text"
+                  placeholder="Search courses by name..."
+                  value={searchTermCourses}
+                  onChange={(e) => setSearchTermCourses(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "9px 12px 9px 36px",
+                    background: "#090d16",
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "8px",
+                    color: "#ffffff",
+                    fontSize: "0.84rem"
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Course Cards Grid */}
+            {filteredCourseList.length === 0 ? (
+              <div className="glass-panel" style={{ padding: "50px 20px", textAlign: "center", color: "var(--text-muted)" }}>
+                <BookOpen size={44} style={{ margin: "0 auto 14px", opacity: 0.4 }} />
+                <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#ffffff" }}>No Courses Found</div>
+                <div style={{ fontSize: "0.85rem", marginTop: "6px", maxWidth: "400px", margin: "6px auto 18px auto" }}>
+                  {searchTermCourses ? "No courses matched your search query." : "Click 'Create New Course' to add your first program."}
+                </div>
+                <button onClick={handleOpenCreateCourseModal} className="btn-primary" style={{ fontSize: "0.85rem" }}>
+                  <Plus size={16} />
+                  <span>Create New Course</span>
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: "22px" }}>
+                {filteredCourseList.map((c) => {
+                  const isSyllabusOpen = expandedSyllabusId === c.id;
+                  const isIT = c.category?.toLowerCase().includes("it") || c.category?.toLowerCase().includes("technology");
+                  return (
+                    <div
+                      key={c.id}
+                      className="glass-panel"
+                      style={{
+                        padding: "24px",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        border: "1px solid var(--border-subtle)",
+                        borderRadius: "16px",
+                        position: "relative"
+                      }}
+                    >
+                      <div>
+                        {/* Badges */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", gap: "8px", flexWrap: "wrap" }}>
+                          <span
+                            className={isIT ? "badge badge-indigo" : "badge badge-emerald"}
+                            style={{ fontSize: "0.72rem", fontWeight: 700 }}
+                          >
+                            {c.category}
+                          </span>
+                          {c.badge && (
+                            <span style={{
+                              fontSize: "0.72rem",
+                              fontWeight: 800,
+                              background: "rgba(245, 158, 11, 0.15)",
+                              color: "#f59e0b",
+                              border: "1px solid rgba(245, 158, 11, 0.3)",
+                              padding: "2px 8px",
+                              borderRadius: "6px"
+                            }}>
+                              ★ {c.badge}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Title & Tagline */}
+                        <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#ffffff", marginBottom: "8px", lineHeight: 1.3 }}>
+                          {c.title}
+                        </h3>
+                        <p style={{ fontSize: "0.84rem", color: "var(--text-muted)", lineHeight: 1.5, marginBottom: "16px" }}>
+                          {c.tagline || "Comprehensive hands-on training with professional certificate."}
+                        </p>
+
+                        {/* Key Info Pills */}
+                        <div style={{
+                          background: "rgba(0, 0, 0, 0.25)",
+                          border: "1px solid var(--border-subtle)",
+                          borderRadius: "10px",
+                          padding: "12px 14px",
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: "10px",
+                          fontSize: "0.82rem",
+                          marginBottom: "16px"
+                        }}>
+                          <div>
+                            <span style={{ color: "var(--text-dim)", display: "block", fontSize: "0.72rem" }}>Tuition Fee</span>
+                            <strong style={{ color: "#34d399", fontSize: "0.95rem" }}>
+                              PKR {Number(c.fee).toLocaleString()}
+                            </strong>
+                            <div style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>
+                              {c.installments || 2} Installment{(c.installments || 2) > 1 ? "s" : ""}
+                            </div>
+                          </div>
+
+                          <div>
+                            <span style={{ color: "var(--text-dim)", display: "block", fontSize: "0.72rem" }}>Duration</span>
+                            <strong style={{ color: "#ffffff", fontSize: "0.88rem" }}>{c.duration}</strong>
+                            <div style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>{c.sessionsPerWeek || "Scheduled classes"}</div>
+                          </div>
+
+                          <div>
+                            <span style={{ color: "var(--text-dim)", display: "block", fontSize: "0.72rem" }}>Level</span>
+                            <span style={{ color: "#38bdf8", fontWeight: 600 }}>{c.level || "All Levels"}</span>
+                          </div>
+
+                          <div>
+                            <span style={{ color: "var(--text-dim)", display: "block", fontSize: "0.72rem" }}>Modules</span>
+                            <span style={{ color: "#a5b4fc", fontWeight: 600 }}>{c.modules?.length || 0} Core Topics</span>
+                          </div>
+                        </div>
+
+                        {/* Syllabus Accordion */}
+                        {c.modules && c.modules.length > 0 && (
+                          <div style={{ marginBottom: "16px" }}>
+                            <button
+                              type="button"
+                              onClick={() => setExpandedSyllabusId(isSyllabusOpen ? null : c.id)}
+                              style={{
+                                width: "100%",
+                                background: "transparent",
+                                border: "none",
+                                color: "#818cf8",
+                                fontSize: "0.8rem",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "6px 0"
+                              }}
+                            >
+                              <span>{isSyllabusOpen ? "▲ Hide Syllabus Outline" : `▼ View Full Syllabus (${c.modules.length} Modules)`}</span>
+                            </button>
+
+                            {isSyllabusOpen && (
+                              <div style={{
+                                marginTop: "8px",
+                                background: "rgba(0, 0, 0, 0.4)",
+                                border: "1px dashed var(--border-subtle)",
+                                borderRadius: "8px",
+                                padding: "12px",
+                                fontSize: "0.78rem",
+                                color: "#cbd5e1",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "6px"
+                              }}>
+                                {c.modules.map((mod, mIdx) => (
+                                  <div key={mIdx} style={{ display: "flex", gap: "8px" }}>
+                                    <span style={{ color: "#38bdf8", fontWeight: 800 }}>{mIdx + 1}.</span>
+                                    <span>{mod}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Footer Actions */}
+                      <div style={{
+                        borderTop: "1px solid var(--border-subtle)",
+                        paddingTop: "14px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "8px"
+                      }}>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button
+                            onClick={() => handleOpenEditCourseModal(c)}
+                            className="btn-secondary"
+                            style={{ padding: "6px 12px", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "4px" }}
+                            title="Edit Course Details"
+                          >
+                            <Edit3 size={13} />
+                            <span>Edit</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteCourse(c.id, c.title)}
+                            style={{
+                              padding: "6px 10px",
+                              borderRadius: "8px",
+                              border: "1px solid rgba(239, 68, 68, 0.3)",
+                              background: "rgba(239, 68, 68, 0.1)",
+                              color: "#f87171",
+                              fontSize: "0.78rem",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "4px"
+                            }}
+                            title="Delete Course"
+                          >
+                            <Trash2 size={13} />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setNewBatch(prev => ({
+                              ...prev,
+                              courseId: c.id,
+                              batchCode: `${c.id.substring(0, 4).toUpperCase()}-${new Date().getFullYear()}`
+                            }));
+                            setShowBatchModal(true);
+                          }}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: "8px",
+                            background: "rgba(99, 102, 241, 0.15)",
+                            border: "1px solid rgba(99, 102, 241, 0.35)",
+                            color: "#a5b4fc",
+                            fontSize: "0.78rem",
+                            fontWeight: 600,
+                            cursor: "pointer"
+                          }}
+                        >
+                          + New Batch
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -2078,6 +2557,269 @@ export default function App() {
       {/* ======================================================== */}
       {/* MODALS                                                   */}
       {/* ======================================================== */}
+      {/* 0. Modal: Create / Edit Course Program                    */}
+      {/* ======================================================== */}
+      {showCourseModal && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+          zIndex: 9999
+        }}>
+          <div className="glass-panel" style={{
+            maxWidth: "600px",
+            width: "100%",
+            maxHeight: "90vh",
+            overflowY: "auto",
+            padding: "28px",
+            borderRadius: "var(--radius-lg)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: "rgba(99, 102, 241, 0.2)", color: "#a5b4fc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <BookOpen size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>
+                    {editingCourse ? "Edit Course Program" : "Create New Course Program"}
+                  </h3>
+                  <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                    Published to LMS, Admission Portals, and Public Website
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setShowCourseModal(false)} style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCourseSubmit}>
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Course Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Artificial Intelligence & Prompt Engineering"
+                  value={courseForm.title}
+                  onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })}
+                  style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Category *</label>
+                  <select
+                    value={courseForm.category}
+                    onChange={(e) => setCourseForm({ ...courseForm, category: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  >
+                    <option value="Information Technology">Information Technology</option>
+                    <option value="Language & Fluency">Language & Fluency</option>
+                    <option value="Professional & Management">Professional & Management</option>
+                    <option value="Creative Arts & Design">Creative Arts & Design</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Badge Highlight</label>
+                  <select
+                    value={courseForm.badge}
+                    onChange={(e) => setCourseForm({ ...courseForm, badge: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  >
+                    <option value="New Course">New Course</option>
+                    <option value="Most Popular">Most Popular</option>
+                    <option value="Trending Tech">Trending Tech</option>
+                    <option value="Flagship Course">Flagship Course</option>
+                    <option value="Career Track">Career Track</option>
+                    <option value="Executive">Executive</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Tagline / Short Pitch *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Master LLMs, Python frameworks, and generative AI deployment"
+                  value={courseForm.tagline}
+                  onChange={(e) => setCourseForm({ ...courseForm, tagline: e.target.value })}
+                  style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Tuition Fee (PKR) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1000}
+                    value={courseForm.fee}
+                    onChange={(e) => setCourseForm({ ...courseForm, fee: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#34d399", fontWeight: 700 }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Installments Allowed</label>
+                  <select
+                    value={courseForm.installments}
+                    onChange={(e) => setCourseForm({ ...courseForm, installments: Number(e.target.value) })}
+                    style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  >
+                    <option value={1}>1 (Full upfront payment)</option>
+                    <option value={2}>2 Installments</option>
+                    <option value={3}>3 Installments</option>
+                    <option value={4}>4 Installments</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Program Duration *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 3 Months (12 Weeks)"
+                    value={courseForm.duration}
+                    onChange={(e) => setCourseForm({ ...courseForm, duration: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Class Schedule / Weekly *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. 4 Days / Week (Daily 2 hrs)"
+                    value={courseForm.sessionsPerWeek}
+                    onChange={(e) => setCourseForm({ ...courseForm, sessionsPerWeek: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Target Proficiency Level</label>
+                  <select
+                    value={courseForm.level}
+                    onChange={(e) => setCourseForm({ ...courseForm, level: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  >
+                    <option value="Beginner to Advanced">Beginner to Advanced</option>
+                    <option value="Foundational">Foundational</option>
+                    <option value="Intermediate to Advanced">Intermediate to Advanced</option>
+                    <option value="Professional / Executive">Professional / Executive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Prerequisites</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Basic computer skills"
+                    value={courseForm.prerequisites}
+                    onChange={(e) => setCourseForm({ ...courseForm, prerequisites: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+              </div>
+
+              {/* Dynamic Modules Syllabus Builder */}
+              <div style={{ marginBottom: "20px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "6px" }}>
+                  Syllabus Modules & Topics ({courseForm.modules.length})
+                </label>
+                <div style={{ display: "flex", gap: "8px", marginBottom: "10px" }}>
+                  <input
+                    type="text"
+                    placeholder="Enter module title (e.g. Node.js & REST API Architecture)"
+                    value={newModuleInput}
+                    onChange={(e) => setNewModuleInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddModuleToForm();
+                      }
+                    }}
+                    style={{ flex: 1, padding: "9px 12px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff", fontSize: "0.85rem" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddModuleToForm}
+                    className="btn-secondary"
+                    style={{ padding: "9px 14px", fontSize: "0.82rem" }}
+                  >
+                    <Plus size={14} />
+                    <span>Add</span>
+                  </button>
+                </div>
+
+                <div style={{
+                  maxHeight: "150px",
+                  overflowY: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "6px",
+                  background: "rgba(0, 0, 0, 0.2)",
+                  padding: "8px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--border-subtle)"
+                }}>
+                  {courseForm.modules.map((mod, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "6px 10px",
+                        background: "rgba(255, 255, 255, 0.03)",
+                        borderRadius: "6px",
+                        fontSize: "0.82rem"
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ color: "#818cf8", fontWeight: 800 }}>{idx + 1}.</span>
+                        <span style={{ color: "#e2e8f0" }}>{mod}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveModuleFromForm(idx)}
+                        style={{ background: "transparent", border: "none", color: "#f87171", cursor: "pointer", padding: "2px" }}
+                        title="Remove module"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <button type="button" onClick={() => setShowCourseModal(false)} className="btn-secondary">
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  <CheckCircle2 size={16} />
+                  <span>{editingCourse ? "Update Course" : "Publish Course to Ecosystem"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* 1. Modal: Invite Faculty via Gmail */}
       {showTeacherModal && (

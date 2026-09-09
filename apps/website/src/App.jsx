@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import EcosystemNav, { getAppUrl } from "@shared/EcosystemNav.jsx";
 import { getCourses, submitInquiry, verifyCertificate } from "@shared/dataStore.js";
 import { COURSE_CATEGORIES, BATCH_SLOTS } from "@shared/constants.js";
@@ -8,15 +8,15 @@ import {
   Sparkles, 
   ArrowRight, 
   CheckCircle2, 
-  Calendar, 
   Clock, 
+  Calendar, 
   Award, 
   Search, 
-  Users, 
-  Monitor, 
-  ShieldCheck, 
-  GraduationCap, 
+  ExternalLink,
+  ShieldCheck,
   ChevronRight,
+  BookOpen,
+  Users,
   X,
   Phone,
   Mail,
@@ -25,9 +25,17 @@ import {
 } from "lucide-react";
 
 export default function App() {
-  const [courses] = useState(getCourses());
+  const [courses, setCourses] = useState(getCourses());
   const [activeTab, setActiveTab] = useState("all");
   const [selectedCourseModal, setSelectedCourseModal] = useState(null);
+
+  useEffect(() => {
+    const handleCoursesChanged = (e) => {
+      setCourses(e.detail || getCourses());
+    };
+    window.addEventListener("apex_courses_changed", handleCoursesChanged);
+    return () => window.removeEventListener("apex_courses_changed", handleCoursesChanged);
+  }, []);
 
   // Form State
   const [formData, setFormData] = useState({
