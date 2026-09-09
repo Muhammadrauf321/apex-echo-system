@@ -4,7 +4,7 @@ const EMAILJS_STORAGE_KEY = "apex_emailjs_config";
 
 const DEFAULT_CONFIG = {
   serviceId: "service_fg9773t",
-  templateId: "",
+  templateId: "template_ts3c7i8",
   publicKey: "",
   isEnabled: true
 };
