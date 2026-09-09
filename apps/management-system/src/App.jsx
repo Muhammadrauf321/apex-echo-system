@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import EcosystemNav from "@shared/EcosystemNav.jsx";
-import { getCurrentUser, subscribeToAuth } from "@shared/auth.js";
+import { getCurrentUser, subscribeToAuth, createAccountInvitation, getInvitations } from "@shared/auth.js";
 import { 
   getCourses, 
   getBatches, 
@@ -18,7 +18,8 @@ import {
   getTeachers,
   addTeacher,
   getStudents,
-  saveStudents
+  saveStudents,
+  enrollStudent
 } from "@shared/dataStore.js";
 import { BATCH_SLOTS, FEE_STATUS, ROLES, ROLE_LABELS, EXAM_STATUS, EXAM_STATUS_LABELS } from "@shared/constants.js";
 import confetti from "canvas-confetti";
@@ -50,7 +51,13 @@ import {
   ShieldCheck,
   Eye,
   AlertTriangle,
-  UserPlus
+  UserPlus,
+  Mail,
+  RefreshCw,
+  GraduationCap,
+  Sparkles,
+  Copy,
+  ExternalLink
 } from "lucide-react";
 
 export default function App() {
@@ -76,10 +83,15 @@ export default function App() {
   // Modals
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
+  const [showEnrollStudentModal, setShowEnrollStudentModal] = useState(false);
   const [showFeeModal, setShowFeeModal] = useState(false);
   const [selectedStudentForFee, setSelectedStudentForFee] = useState(null);
   const [feePaymentAmount, setFeePaymentAmount] = useState("");
   const [receiptToPrint, setReceiptToPrint] = useState(null);
+
+  // Search terms
+  const [searchTermFaculty, setSearchTermFaculty] = useState("");
+  const [searchTermStudents, setSearchTermStudents] = useState("");
 
   // New Batch Form State
   const [newBatch, setNewBatch] = useState({
@@ -92,13 +104,30 @@ export default function App() {
     capacity: 25
   });
 
-  // New Teacher Form State
+  // New Teacher Form State (Gmail Invitation)
   const [newTeacherForm, setNewTeacherForm] = useState({
     name: "",
     email: "",
-    department: "IT & Software",
+    department: "IT & Web Development",
     phone: ""
   });
+  const [isInvitingTeacher, setIsInvitingTeacher] = useState(false);
+
+  // New Student Form State (Gmail Invitation)
+  const [newStudentForm, setNewStudentForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    course: courses[0]?.title || "",
+    batchCode: "",
+    totalFee: 20000
+  });
+  const [isEnrollingStudent, setIsEnrollingStudent] = useState(false);
+
+  // Attendance Register State
+  const [selectedBatchForAttendance, setSelectedBatchForAttendance] = useState("");
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
+  const [studentAttendanceMarks, setStudentAttendanceMarks] = useState({});
 
   // Certificate Issuance State
   const [certForm, setCertForm] = useState({
@@ -111,7 +140,6 @@ export default function App() {
   const [issuedCert, setIssuedCert] = useState(null);
 
   // Attendance Register State
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
   const [attendanceRecords, setAttendanceRecords] = useState({});
 
   // --- Examination Lifecycle State ---
@@ -211,41 +239,136 @@ export default function App() {
     }
   }, [statusBanner]);
 
-  // Handle Admission Inquiry Approval
-  const handleApproveInquiry = (inq) => {
+  // Handle Admission Inquiry Approval with Gmail Activation Dispatch
+  const handleApproveInquiry = async (inq) => {
     updateInquiryStatus(inq.id, "approved");
-    const newStd = {
-      id: `std_${Date.now().toString().slice(-4)}`,
+
+    let tempCode = "";
+    if (inq.email) {
+      const inviteRes = await createAccountInvitation({
+        name: inq.name,
+        email: inq.email,
+        role: "student",
+        course: inq.courseTitle,
+        batchCode: inq.preferredSlot || "BAT-NEW",
+        phone: inq.phone
+      });
+      if (inviteRes.success) {
+        tempCode = inviteRes.invitation.tempCode;
+      }
+    }
+
+    enrollStudent({
       name: inq.name,
+      email: inq.email || "",
       phone: inq.phone || "",
       course: inq.courseTitle,
-      batchCode: inq.preferredSlot || "Assigned Soon",
+      batchCode: inq.preferredSlot || "BAT-NEW",
       totalFee: 20000,
       paidFee: 0,
-      status: FEE_STATUS.PENDING,
-      attendance: 100
-    };
-    const updated = [newStd, ...students];
-    setStudents(updated);
-    saveStudents(updated);
+      activationStatus: inq.email ? "pending_activation" : "active"
+    });
+
+    setStudents(getStudents());
+    setInquiries(getInquiries());
 
     setStatusBanner({
       type: "success",
-      message: `Admission approved for ${inq.name}. Enrolled into active student register.`
+      message: inq.email
+        ? `Admission approved! Activation email dispatched to ${inq.email} with Temporary Security Code: ${tempCode}.`
+        : `Admission approved for ${inq.name}. Enrolled into active student register.`
     });
   };
 
-  // Handle Add Teacher
-  const handleCreateTeacher = (e) => {
+  // Handle Invite Teacher via Gmail
+  const handleCreateTeacher = async (e) => {
     e.preventDefault();
     if (!newTeacherForm.name || !newTeacherForm.email) return;
-    addTeacher(newTeacherForm);
+
+    setIsInvitingTeacher(true);
+    const inviteRes = await createAccountInvitation({
+      name: newTeacherForm.name,
+      email: newTeacherForm.email,
+      role: "instructor",
+      department: newTeacherForm.department,
+      phone: newTeacherForm.phone
+    });
+    setIsInvitingTeacher(false);
+
+    addTeacher({
+      name: newTeacherForm.name,
+      email: newTeacherForm.email,
+      department: newTeacherForm.department,
+      phone: newTeacherForm.phone,
+      status: "pending_activation"
+    });
+
     setTeachers(getTeachers());
     setShowTeacherModal(false);
-    setNewTeacherForm({ name: "", email: "", department: "IT & Software", phone: "" });
+    const tempCode = inviteRes.success ? inviteRes.invitation.tempCode : "";
+    setNewTeacherForm({ name: "", email: "", department: "IT & Web Development", phone: "" });
+
     setStatusBanner({
       type: "success",
-      message: `Teacher ${newTeacherForm.name} registered. They can now be assigned to batches and question papers.`
+      message: `Activation email dispatched to ${newTeacherForm.email} with Temporary Security Code: ${tempCode}. Account pending faculty activation.`
+    });
+  };
+
+  // Handle Direct Student Enrollment via Gmail
+  const handleEnrollStudent = async (e) => {
+    e.preventDefault();
+    if (!newStudentForm.name || !newStudentForm.email) return;
+
+    setIsEnrollingStudent(true);
+    const inviteRes = await createAccountInvitation({
+      name: newStudentForm.name,
+      email: newStudentForm.email,
+      role: "student",
+      course: newStudentForm.course,
+      batchCode: newStudentForm.batchCode,
+      phone: newStudentForm.phone
+    });
+    setIsEnrollingStudent(false);
+
+    enrollStudent({
+      name: newStudentForm.name,
+      email: newStudentForm.email,
+      phone: newStudentForm.phone,
+      course: newStudentForm.course,
+      batchCode: newStudentForm.batchCode || "BAT-NEW",
+      totalFee: Number(newStudentForm.totalFee) || 20000,
+      paidFee: 0,
+      activationStatus: "pending_activation"
+    });
+
+    setStudents(getStudents());
+    setShowEnrollStudentModal(false);
+    const tempCode = inviteRes.success ? inviteRes.invitation.tempCode : "";
+    setNewStudentForm({
+      name: "",
+      email: "",
+      phone: "",
+      course: courses[0]?.title || "",
+      batchCode: "",
+      totalFee: 20000
+    });
+
+    setStatusBanner({
+      type: "success",
+      message: `Activation email dispatched to ${newStudentForm.email} with Temporary Security Code: ${tempCode}. Student can now activate their ID.`
+    });
+  };
+
+  // Handle Resend Invitation Email
+  const handleResendInvite = async (recipientEmail, name, role) => {
+    const inviteRes = await createAccountInvitation({
+      name,
+      email: recipientEmail,
+      role
+    });
+    setStatusBanner({
+      type: "success",
+      message: `Activation email re-dispatched to ${recipientEmail} (Security Code: ${inviteRes.invitation?.tempCode}).`
     });
   };
 
@@ -842,13 +965,22 @@ export default function App() {
         {/* ======================================================== */}
         {activeTab === "fees" && isAdmin && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
               <div>
                 <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>Admissions & Student Accounts</h2>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                  Record student fee payments and generate verified printable receipts
+                  Enroll students via Gmail, monitor ID activations, and record fee receipts
                 </p>
               </div>
+
+              <button
+                onClick={() => setShowEnrollStudentModal(true)}
+                className="btn-primary"
+                style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                <UserPlus size={16} />
+                <span>Enroll Student via Gmail</span>
+              </button>
             </div>
 
             {students.length === 0 ? (
@@ -856,7 +988,7 @@ export default function App() {
                 <DollarSign size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
                 <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>No Enrolled Students Yet</div>
                 <div style={{ fontSize: "0.85rem", marginTop: "4px" }}>
-                  When admissions are approved from the Overview tab, students will appear here for fee tracking.
+                  Click <strong>Enroll Student via Gmail</strong> above or approve admission inquiries from the Overview tab.
                 </div>
               </div>
             ) : (
@@ -864,27 +996,57 @@ export default function App() {
                 <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.9rem" }}>
                   <thead>
                     <tr style={{ borderBottom: "1px solid var(--border-subtle)", color: "var(--text-muted)", fontSize: "0.78rem", textTransform: "uppercase" }}>
-                      <th style={{ padding: "16px" }}>Student Name</th>
+                      <th style={{ padding: "16px" }}>Student & Contact</th>
                       <th style={{ padding: "16px" }}>Course & Batch</th>
+                      <th style={{ padding: "16px" }}>Activation Status</th>
                       <th style={{ padding: "16px" }}>Total Fee</th>
                       <th style={{ padding: "16px" }}>Paid Amount</th>
                       <th style={{ padding: "16px" }}>Balance</th>
-                      <th style={{ padding: "16px" }}>Status</th>
+                      <th style={{ padding: "16px" }}>Fee Status</th>
                       <th style={{ padding: "16px", textAlign: "right" }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {students.map((std) => {
                       const balance = std.totalFee - std.paidFee;
+                      const isPendingActivation = std.activationStatus === "pending_activation";
                       return (
                         <tr key={std.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
                           <td style={{ padding: "16px", fontWeight: 600 }}>
                             <div>{std.name}</div>
-                            <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{std.phone}</div>
+                            <div style={{ fontSize: "0.75rem", color: "#38bdf8" }}>{std.email || "No email on file"}</div>
+                            {std.phone && <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{std.phone}</div>}
                           </td>
                           <td style={{ padding: "16px" }}>
                             <div>{std.course}</div>
-                            <div style={{ fontSize: "0.75rem", color: "#38bdf8" }}>{std.batchCode}</div>
+                            <div style={{ fontSize: "0.75rem", color: "#a5b4fc" }}>{std.batchCode}</div>
+                          </td>
+                          <td style={{ padding: "16px" }}>
+                            {isPendingActivation ? (
+                              <span style={{
+                                fontSize: "0.72rem",
+                                padding: "3px 8px",
+                                borderRadius: "6px",
+                                background: "rgba(245, 158, 11, 0.15)",
+                                color: "#fbbf24",
+                                border: "1px solid rgba(245, 158, 11, 0.3)",
+                                fontWeight: 700
+                              }}>
+                                ● Pending Activation
+                              </span>
+                            ) : (
+                              <span style={{
+                                fontSize: "0.72rem",
+                                padding: "3px 8px",
+                                borderRadius: "6px",
+                                background: "rgba(16, 185, 129, 0.15)",
+                                color: "#34d399",
+                                border: "1px solid rgba(16, 185, 129, 0.3)",
+                                fontWeight: 700
+                              }}>
+                                ● Active Account
+                              </span>
+                            )}
                           </td>
                           <td style={{ padding: "16px" }}>PKR {std.totalFee.toLocaleString()}</td>
                           <td style={{ padding: "16px", color: "#34d399", fontWeight: 600 }}>PKR {std.paidFee.toLocaleString()}</td>
@@ -901,37 +1063,51 @@ export default function App() {
                             )}
                           </td>
                           <td style={{ padding: "16px", textAlign: "right" }}>
-                            {balance > 0 ? (
-                              <button
-                                onClick={() => {
-                                  setSelectedStudentForFee(std);
-                                  setShowFeeModal(true);
-                                }}
-                                className="btn-primary"
-                                style={{ padding: "6px 14px", fontSize: "0.8rem" }}
-                              >
-                                Collect Fee
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setReceiptToPrint({
-                                    receiptNo: `APEX-RCP-${std.id.toUpperCase()}`,
-                                    date: new Date().toLocaleDateString(),
-                                    studentName: std.name,
-                                    course: std.course,
-                                    batchCode: std.batchCode,
-                                    amountPaid: std.totalFee,
-                                    remainingBalance: 0
-                                  });
-                                }}
-                                className="btn-secondary"
-                                style={{ padding: "6px 12px", fontSize: "0.8rem" }}
-                              >
-                                <Printer size={14} />
-                                <span>Receipt</span>
-                              </button>
-                            )}
+                            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
+                              {isPendingActivation && std.email && (
+                                <button
+                                  onClick={() => handleResendInvite(std.email, std.name, "student")}
+                                  className="btn-secondary"
+                                  style={{ padding: "6px 10px", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#38bdf8" }}
+                                  title="Resend Activation Email"
+                                >
+                                  <RefreshCw size={12} />
+                                  <span>Resend</span>
+                                </button>
+                              )}
+
+                              {balance > 0 ? (
+                                <button
+                                  onClick={() => {
+                                    setSelectedStudentForFee(std);
+                                    setShowFeeModal(true);
+                                  }}
+                                  className="btn-primary"
+                                  style={{ padding: "6px 12px", fontSize: "0.8rem" }}
+                                >
+                                  Collect Fee
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setReceiptToPrint({
+                                      receiptNo: `APEX-RCP-${std.id.toUpperCase()}`,
+                                      date: new Date().toLocaleDateString(),
+                                      studentName: std.name,
+                                      course: std.course,
+                                      batchCode: std.batchCode,
+                                      amountPaid: std.totalFee,
+                                      remainingBalance: 0
+                                    });
+                                  }}
+                                  className="btn-secondary"
+                                  style={{ padding: "6px 12px", fontSize: "0.8rem" }}
+                                >
+                                  <Printer size={14} />
+                                  <span>Receipt</span>
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -948,11 +1124,11 @@ export default function App() {
         {/* ======================================================== */}
         {activeTab === "faculty" && isAdmin && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
               <div>
                 <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>Teaching Faculty & Staff Directory</h2>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                  Register instructors so they can be assigned to question papers and class batches
+                  Invite instructors via Gmail to author exam questions and manage class batches
                 </p>
               </div>
 
@@ -962,7 +1138,7 @@ export default function App() {
                 style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "6px" }}
               >
                 <UserPlus size={16} />
-                <span>Register New Teacher</span>
+                <span>Invite Teacher via Gmail</span>
               </button>
             </div>
 
@@ -971,28 +1147,61 @@ export default function App() {
                 <Users size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
                 <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>No Teachers Registered Yet</div>
                 <div style={{ fontSize: "0.85rem", marginTop: "4px" }}>
-                  Click "Register New Teacher" to add your faculty members.
+                  Click "Invite Teacher via Gmail" to dispatch activation emails to your instructors.
                 </div>
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
-                {teachers.map(t => (
-                  <div key={t.id} className="glass-panel" style={{ padding: "18px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
-                      <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "rgba(16, 185, 129, 0.2)", color: "#34d399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "1rem" }}>
-                        {t.name[0]}
-                      </div>
+                {teachers.map(t => {
+                  const isPending = t.status === "pending_activation";
+                  return (
+                    <div key={t.id} className="glass-panel" style={{ padding: "18px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{t.name}</div>
-                        <div style={{ fontSize: "0.78rem", color: "#38bdf8" }}>{t.department}</div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "rgba(16, 185, 129, 0.2)", color: "#34d399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "1rem" }}>
+                              {t.name[0]}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{t.name}</div>
+                              <div style={{ fontSize: "0.78rem", color: "#38bdf8" }}>{t.department}</div>
+                            </div>
+                          </div>
+
+                          <span style={{
+                            fontSize: "0.7rem",
+                            padding: "2px 8px",
+                            borderRadius: "6px",
+                            fontWeight: 700,
+                            background: isPending ? "rgba(245, 158, 11, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                            color: isPending ? "#fbbf24" : "#34d399",
+                            border: `1px solid ${isPending ? "rgba(245,158,11,0.3)" : "rgba(16,185,129,0.3)"}`
+                          }}>
+                            {isPending ? "● Pending Activation" : "● Active Faculty"}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", borderTop: "1px solid var(--border-subtle)", paddingTop: "10px" }}>
+                          <div>Email: <strong style={{ color: "#fff" }}>{t.email}</strong></div>
+                          {t.phone && <div>Phone: {t.phone}</div>}
+                        </div>
                       </div>
+
+                      {isPending && (
+                        <div style={{ marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px", display: "flex", justifyContent: "flex-end" }}>
+                          <button
+                            onClick={() => handleResendInvite(t.email, t.name, "instructor")}
+                            className="btn-secondary"
+                            style={{ padding: "5px 12px", fontSize: "0.76rem", display: "inline-flex", alignItems: "center", gap: "6px", color: "#38bdf8" }}
+                          >
+                            <RefreshCw size={12} />
+                            <span>Resend Activation Email</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", borderTop: "1px solid var(--border-subtle)", paddingTop: "8px" }}>
-                      <div>Email: <strong style={{ color: "#fff" }}>{t.email}</strong></div>
-                      {t.phone && <div>Phone: {t.phone}</div>}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1403,13 +1612,384 @@ export default function App() {
           </div>
         )}
 
+        {/* ======================================================== */}
+        {/* 7. STUDENT: MY BATCH & SCHEDULE                           */}
+        {/* ======================================================== */}
+        {activeTab === "my_schedule" && isStudent && (
+          <div>
+            <div style={{ marginBottom: "20px" }}>
+              <h2 style={{ fontSize: "1.35rem", fontWeight: 800 }}>My Batch & Academic Schedule</h2>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                Official class timings, assigned laboratory, and faculty mentor details
+              </p>
+            </div>
+
+            {(() => {
+              const enrolledStd = students.find(s => s.email?.toLowerCase() === currentUser?.email?.toLowerCase() || s.name?.toLowerCase() === currentUser?.name?.toLowerCase());
+              const studentBatch = batches.find(b => b.batchCode === enrolledStd?.batchCode) || batches[0];
+              const studentCourse = courses.find(c => c.title === enrolledStd?.course || c.id === studentBatch?.courseId) || courses[0];
+
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "24px" }}>
+                  {/* Primary Schedule Card */}
+                  <div className="glass-panel" style={{ padding: "28px", borderTop: "4px solid #6366f1" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px", marginBottom: "20px" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+                          <span className="badge badge-indigo" style={{ fontSize: "0.85rem", fontWeight: 800, padding: "4px 10px" }}>
+                            {enrolledStd?.batchCode || studentBatch?.batchCode || "BAT-NEW"}
+                          </span>
+                          <span className="badge badge-emerald">● Class in Session</span>
+                        </div>
+                        <h3 style={{ fontSize: "1.5rem", fontWeight: 900, color: "#ffffff" }}>
+                          {enrolledStd?.course || studentCourse?.title || "Enrolled Course Program"}
+                        </h3>
+                        <div style={{ fontSize: "0.9rem", color: "#38bdf8", marginTop: "4px" }}>
+                          {studentCourse?.tagline}
+                        </div>
+                      </div>
+
+                      <div style={{ textAlign: "right", background: "rgba(255,255,255,0.03)", padding: "12px 18px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div style={{ fontSize: "0.78rem", color: "var(--text-dim)" }}>Lead Instructor</div>
+                        <div style={{ fontSize: "1rem", fontWeight: 700, color: "#ffffff", marginTop: "2px" }}>
+                          {studentBatch?.instructor || "Faculty Assigned"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Meta Grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", margin: "20px 0" }}>
+                      <div style={{ background: "rgba(0,0,0,0.3)", padding: "14px", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "4px" }}>
+                          <Clock size={16} color="#38bdf8" />
+                          <span>Class Timings & Days</span>
+                        </div>
+                        <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>
+                          {studentBatch?.timeSlot || "Mon - Thu (06:00 PM - 08:00 PM)"}
+                        </div>
+                      </div>
+
+                      <div style={{ background: "rgba(0,0,0,0.3)", padding: "14px", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "4px" }}>
+                          <Building size={16} color="#818cf8" />
+                          <span>Classroom / Lab Location</span>
+                        </div>
+                        <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>
+                          {studentBatch?.lab || "Main Computing Lab 1"}
+                        </div>
+                      </div>
+
+                      <div style={{ background: "rgba(0,0,0,0.3)", padding: "14px", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--text-dim)", fontSize: "0.8rem", marginBottom: "4px" }}>
+                          <CheckCircle2 size={16} color="#34d399" />
+                          <span>Course Duration</span>
+                        </div>
+                        <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#ffffff" }}>
+                          {studentCourse?.duration || "16 Weeks"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Curriculum Modules Breakdown */}
+                    {studentCourse?.modules && (
+                      <div style={{ marginTop: "24px" }}>
+                        <h4 style={{ fontSize: "1rem", fontWeight: 800, marginBottom: "12px", color: "#e2e8f0" }}>
+                          Curriculum Syllabus & Progress
+                        </h4>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                          {studentCourse.modules.map((mod, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", background: "rgba(255,255,255,0.02)", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)", fontSize: "0.84rem" }}>
+                              <span style={{ color: "#38bdf8", fontWeight: 800 }}>0{i + 1}.</span>
+                              <span style={{ color: "#cbd5e1" }}>{mod}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Ecosystem Integration button */}
+                    <div style={{ marginTop: "24px", paddingTop: "18px", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ fontSize: "0.82rem", color: "var(--text-dim)" }}>
+                        Need help or want to chat with your batch mates?
+                      </div>
+                      <a
+                        href="http://localhost:5174"
+                        className="btn-primary"
+                        style={{ fontSize: "0.85rem", padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                      >
+                        <MessageSquare size={15} />
+                        <span>Open Apex Connect Class Group</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* 8. ATTENDANCE: TEACHER REGISTER OR STUDENT STATUS         */}
+        {/* ======================================================== */}
+        {activeTab === "attendance" && (
+          <div>
+            {/* TEACHER ATTENDANCE REGISTER */}
+            {isTeacher && (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
+                  <div>
+                    <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>Class Attendance Register</h2>
+                    <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                      Mark daily attendance for students in your assigned batches
+                    </p>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div>
+                      <label style={{ fontSize: "0.8rem", color: "var(--text-dim)", marginRight: "6px" }}>Session Date:</label>
+                      <input
+                        type="date"
+                        value={attendanceDate}
+                        onChange={(e) => setAttendanceDate(e.target.value)}
+                        style={{ padding: "8px 12px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff", fontSize: "0.85rem" }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {students.length === 0 ? (
+                  <div className="glass-panel" style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
+                    <Users size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
+                    <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>No Students Enrolled Yet</div>
+                    <div style={{ fontSize: "0.85rem", marginTop: "4px" }}>
+                      When students are enrolled by Admin, they will appear here for daily attendance tracking.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="glass-panel" style={{ padding: "24px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                      <div style={{ fontWeight: 700, fontSize: "1rem" }}>
+                        Enrolled Batch Students ({students.length})
+                      </div>
+                      <button
+                        onClick={() => {
+                          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+                          setStatusBanner({
+                            type: "success",
+                            message: `Attendance submitted and officially logged for date ${attendanceDate}.`
+                          });
+                        }}
+                        className="btn-primary"
+                        style={{ fontSize: "0.85rem", padding: "8px 18px" }}
+                      >
+                        <CheckSquare size={16} />
+                        <span>Save & Submit Register</span>
+                      </button>
+                    </div>
+
+                    <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.9rem" }}>
+                      <thead>
+                        <tr style={{ borderBottom: "1px solid var(--border-subtle)", color: "var(--text-muted)", fontSize: "0.78rem", textTransform: "uppercase" }}>
+                          <th style={{ padding: "14px" }}>Student Name</th>
+                          <th style={{ padding: "14px" }}>Course & Batch</th>
+                          <th style={{ padding: "14px" }}>Current Record</th>
+                          <th style={{ padding: "14px", textAlign: "right" }}>Daily Attendance Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {students.map((std) => {
+                          const mark = studentAttendanceMarks[std.id] || "present";
+                          return (
+                            <tr key={std.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                              <td style={{ padding: "14px", fontWeight: 600 }}>
+                                <div>{std.name}</div>
+                                <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{std.email}</div>
+                              </td>
+                              <td style={{ padding: "14px" }}>
+                                <div>{std.course}</div>
+                                <div style={{ fontSize: "0.75rem", color: "#38bdf8" }}>{std.batchCode}</div>
+                              </td>
+                              <td style={{ padding: "14px" }}>
+                                <span style={{ color: "#34d399", fontWeight: 700 }}>
+                                  {std.attendance || 100}% Present
+                                </span>
+                              </td>
+                              <td style={{ padding: "14px", textAlign: "right" }}>
+                                <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                                  <button
+                                    onClick={() => setStudentAttendanceMarks({ ...studentAttendanceMarks, [std.id]: "present" })}
+                                    style={{
+                                      padding: "6px 12px",
+                                      borderRadius: "6px",
+                                      fontSize: "0.78rem",
+                                      fontWeight: 700,
+                                      border: "none",
+                                      cursor: "pointer",
+                                      background: mark === "present" ? "#10b981" : "rgba(255,255,255,0.05)",
+                                      color: mark === "present" ? "#ffffff" : "#94a3b8"
+                                    }}
+                                  >
+                                    Present
+                                  </button>
+                                  <button
+                                    onClick={() => setStudentAttendanceMarks({ ...studentAttendanceMarks, [std.id]: "late" })}
+                                    style={{
+                                      padding: "6px 12px",
+                                      borderRadius: "6px",
+                                      fontSize: "0.78rem",
+                                      fontWeight: 700,
+                                      border: "none",
+                                      cursor: "pointer",
+                                      background: mark === "late" ? "#f59e0b" : "rgba(255,255,255,0.05)",
+                                      color: mark === "late" ? "#ffffff" : "#94a3b8"
+                                    }}
+                                  >
+                                    Late
+                                  </button>
+                                  <button
+                                    onClick={() => setStudentAttendanceMarks({ ...studentAttendanceMarks, [std.id]: "absent" })}
+                                    style={{
+                                      padding: "6px 12px",
+                                      borderRadius: "6px",
+                                      fontSize: "0.78rem",
+                                      fontWeight: 700,
+                                      border: "none",
+                                      cursor: "pointer",
+                                      background: mark === "absent" ? "#ef4444" : "rgba(255,255,255,0.05)",
+                                      color: mark === "absent" ? "#ffffff" : "#94a3b8"
+                                    }}
+                                  >
+                                    Absent
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* STUDENT ATTENDANCE STATUS */}
+            {isStudent && (
+              <div>
+                <div style={{ marginBottom: "20px" }}>
+                  <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>My Attendance Record</h2>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                    Attendance is tracked digitally to ensure eligibility for examinations and certifications (Min. 80% required)
+                  </p>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px", marginBottom: "24px" }}>
+                  <div className="glass-panel" style={{ padding: "24px" }}>
+                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "8px" }}>Overall Attendance</div>
+                    <div style={{ fontSize: "2.4rem", fontWeight: 900, color: "#34d399" }}>96%</div>
+                    <div style={{ fontSize: "0.78rem", color: "#10b981", marginTop: "4px" }}>
+                      ● Fully Eligible for Final Examinations
+                    </div>
+                  </div>
+
+                  <div className="glass-panel" style={{ padding: "24px" }}>
+                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "8px" }}>Total Sessions Held</div>
+                    <div style={{ fontSize: "2.4rem", fontWeight: 900, color: "#ffffff" }}>32</div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--text-dim)", marginTop: "4px" }}>
+                      Academic Term 2026
+                    </div>
+                  </div>
+
+                  <div className="glass-panel" style={{ padding: "24px" }}>
+                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "8px" }}>Classes Attended</div>
+                    <div style={{ fontSize: "2.4rem", fontWeight: 900, color: "#38bdf8" }}>31</div>
+                    <div style={{ fontSize: "0.78rem", color: "#38bdf8", marginTop: "4px" }}>
+                      1 excused absence
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-panel" style={{ padding: "24px" }}>
+                  <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "14px" }}>Recent Session Logs</h3>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {[
+                      { date: "Yesterday (06:00 PM)", topic: "Advanced React State Management & Hooks", status: "Present", color: "#34d399" },
+                      { date: "3 Days Ago (06:00 PM)", topic: "Component Life Cycle & Async APIs", status: "Present", color: "#34d399" },
+                      { date: "Last Week (06:00 PM)", topic: "Modern JavaScript ES6+ Architecture", status: "Present", color: "#34d399" },
+                      { date: "2 Weeks Ago (06:00 PM)", topic: "Flexbox, Grid & Responsive UI Design", status: "Late (10 mins)", color: "#fbbf24" },
+                    ].map((log, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "rgba(0,0,0,0.25)", borderRadius: "8px", border: "1px solid var(--border-subtle)" }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{log.topic}</div>
+                          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{log.date}</div>
+                        </div>
+                        <span style={{ fontSize: "0.8rem", fontWeight: 700, color: log.color }}>
+                          ● {log.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* 9. STUDENT CERTIFICATES VIEW                             */}
+        {/* ======================================================== */}
+        {activeTab === "certificates" && isStudent && (
+          <div>
+            <div style={{ marginBottom: "20px" }}>
+              <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>My Verified Digital Certificates</h2>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                Accredited certificates issued upon successful program completion and examination verification
+              </p>
+            </div>
+
+            {certificates.length === 0 ? (
+              <div className="glass-panel" style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
+                <Award size={42} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
+                <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>Program In Progress</div>
+                <div style={{ fontSize: "0.85rem", marginTop: "4px", maxWidth: "500px", margin: "4px auto 0" }}>
+                  Digital certificates with unique verification IDs will be issued here once coursework, attendance, and final examinations are cleared.
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", gap: "20px" }}>
+                {certificates.map(cert => (
+                  <div key={cert.certificateId} className="glass-panel" style={{ padding: "24px", border: "2px solid #eab308" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px" }}>
+                      <span className="badge badge-amber" style={{ fontWeight: 800 }}>{cert.certificateId}</span>
+                      <span className="badge badge-emerald">Verified Authentic</span>
+                    </div>
+                    <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#ffffff", marginBottom: "4px" }}>
+                      {cert.courseTitle}
+                    </h3>
+                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "12px" }}>
+                      Awarded to: <strong style={{ color: "#fff" }}>{cert.studentName}</strong> ({cert.grade})
+                    </div>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span>Issued: {cert.issueDate}</span>
+                      <button onClick={() => window.print()} className="btn-secondary" style={{ padding: "4px 10px", fontSize: "0.75rem" }}>
+                        <Printer size={13} />
+                        <span>Print</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
 
       {/* ======================================================== */}
       {/* MODALS                                                   */}
       {/* ======================================================== */}
 
-      {/* 1. Modal: Register New Teacher */}
+      {/* 1. Modal: Invite Faculty via Gmail */}
       {showTeacherModal && (
         <div style={{
           position: "fixed",
@@ -1422,17 +2002,24 @@ export default function App() {
           padding: "20px",
           zIndex: 9999
         }}>
-          <div className="glass-panel" style={{ maxWidth: "460px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h3 style={{ fontSize: "1.2rem", fontWeight: 800 }}>Register Faculty Member</h3>
+          <div className="glass-panel" style={{ maxWidth: "480px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <Mail size={20} color="#38bdf8" />
+                <h3 style={{ fontSize: "1.2rem", fontWeight: 800 }}>Invite Faculty Member via Gmail</h3>
+              </div>
               <button onClick={() => setShowTeacherModal(false)} style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}>
                 <X size={20} />
               </button>
             </div>
 
+            <div style={{ padding: "10px 14px", background: "rgba(56, 189, 248, 0.1)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: "8px", marginBottom: "16px", fontSize: "0.82rem", color: "#bae6fd" }}>
+              <strong>Security Protocol:</strong> An activation email containing a secure link and temporary security code will be dispatched to this Gmail address. The teacher must activate their ID and set their permanent password before accessing the ecosystem.
+            </div>
+
             <form onSubmit={handleCreateTeacher}>
               <div style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Teacher Name *</label>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Instructor Full Name *</label>
                 <input
                   type="text"
                   required
@@ -1444,11 +2031,11 @@ export default function App() {
               </div>
 
               <div style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Official Email *</label>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Official Gmail Address *</label>
                 <input
                   type="email"
                   required
-                  placeholder="name@apex.edu"
+                  placeholder="e.g. teacher.name@gmail.com"
                   value={newTeacherForm.email}
                   onChange={(e) => setNewTeacherForm({ ...newTeacherForm, email: e.target.value })}
                   style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
@@ -1470,7 +2057,7 @@ export default function App() {
               </div>
 
               <div style={{ marginBottom: "20px" }}>
-                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Phone</label>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Contact Phone</label>
                 <input
                   type="text"
                   placeholder="+92 300 1234567"
@@ -1482,14 +2069,127 @@ export default function App() {
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
                 <button type="button" onClick={() => setShowTeacherModal(false)} className="btn-secondary">Cancel</button>
-                <button type="submit" className="btn-primary">Register Teacher</button>
+                <button type="submit" disabled={isInvitingTeacher} className="btn-primary">
+                  {isInvitingTeacher ? "Dispatching Email..." : "Dispatch Invitation Email"}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* 2. Modal: Schedule Exam */}
+      {/* 2. Modal: Enroll Student via Gmail */}
+      {showEnrollStudentModal && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+          zIndex: 9999
+        }}>
+          <div className="glass-panel" style={{ maxWidth: "500px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <GraduationCap size={20} color="#38bdf8" />
+                <h3 style={{ fontSize: "1.2rem", fontWeight: 800 }}>Enroll Student via Gmail</h3>
+              </div>
+              <button onClick={() => setShowEnrollStudentModal(false)} style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ padding: "10px 14px", background: "rgba(56, 189, 248, 0.1)", border: "1px solid rgba(56, 189, 248, 0.3)", borderRadius: "8px", marginBottom: "16px", fontSize: "0.82rem", color: "#bae6fd" }}>
+              <strong>Activation Protocol:</strong> Enrolling this student dispatches an activation email to their Gmail with a secure link and temporary code. The student will activate their ID and set their permanent password.
+            </div>
+
+            <form onSubmit={handleEnrollStudent}>
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Student Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Tariq Mehmood"
+                  value={newStudentForm.name}
+                  onChange={(e) => setNewStudentForm({ ...newStudentForm, name: e.target.value })}
+                  style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Student Gmail Address *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="student@gmail.com"
+                    value={newStudentForm.email}
+                    onChange={(e) => setNewStudentForm({ ...newStudentForm, email: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Contact Phone</label>
+                  <input
+                    type="text"
+                    placeholder="+92 300 0000000"
+                    value={newStudentForm.phone}
+                    onChange={(e) => setNewStudentForm({ ...newStudentForm, phone: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Course Program *</label>
+                <select
+                  value={newStudentForm.course}
+                  onChange={(e) => setNewStudentForm({ ...newStudentForm, course: e.target.value })}
+                  style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                >
+                  {courses.map(c => (
+                    <option key={c.id} value={c.title}>{c.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Batch / Time Slot</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. BAT-701 or Evening Slot"
+                    value={newStudentForm.batchCode}
+                    onChange={(e) => setNewStudentForm({ ...newStudentForm, batchCode: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Total Fee (PKR)</label>
+                  <input
+                    type="number"
+                    value={newStudentForm.totalFee}
+                    onChange={(e) => setNewStudentForm({ ...newStudentForm, totalFee: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <button type="button" onClick={() => setShowEnrollStudentModal(false)} className="btn-secondary">Cancel</button>
+                <button type="submit" disabled={isEnrollingStudent} className="btn-primary">
+                  {isEnrollingStudent ? "Dispatching..." : "Enroll & Dispatch Activation Email"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Modal: Schedule Exam */}
       {showScheduleExamModal && (
         <div style={{
           position: "fixed",

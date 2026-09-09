@@ -81,6 +81,10 @@ export function getTeachers() {
 
 export function addTeacher(teacherData) {
   const teachers = getTeachers();
+  const existing = teachers.find(t => t.email.toLowerCase() === teacherData.email.toLowerCase());
+  if (existing) {
+    return existing;
+  }
   const newTeacher = {
     id: `tch_${Date.now()}`,
     name: teacherData.name,
@@ -88,6 +92,7 @@ export function addTeacher(teacherData) {
     department: teacherData.department || "IT",
     phone: teacherData.phone || "",
     role: "instructor",
+    status: teacherData.status || "pending_activation",
     createdAt: new Date().toISOString()
   };
   teachers.push(newTeacher);
@@ -125,6 +130,27 @@ export function getStudents() {
 export function saveStudents(students) {
   localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
   window.dispatchEvent(new CustomEvent("apex_students_changed", { detail: students }));
+}
+
+export function enrollStudent(studentData) {
+  const students = getStudents();
+  const newStudent = {
+    id: `std_${Date.now().toString().slice(-4)}`,
+    name: studentData.name,
+    email: studentData.email || "",
+    phone: studentData.phone || "",
+    course: studentData.course,
+    batchCode: studentData.batchCode || "Assigned Soon",
+    totalFee: studentData.totalFee || 20000,
+    paidFee: studentData.paidFee || 0,
+    status: studentData.paidFee >= (studentData.totalFee || 20000) ? FEE_STATUS.PAID : FEE_STATUS.PENDING,
+    activationStatus: studentData.activationStatus || "pending_activation",
+    attendance: studentData.attendance || 100,
+    createdAt: new Date().toISOString()
+  };
+  const updated = [newStudent, ...students];
+  saveStudents(updated);
+  return newStudent;
 }
 
 // --- Inquiries ---
