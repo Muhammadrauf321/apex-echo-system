@@ -1,32 +1,8 @@
-import { initializeApp, getApps } from "firebase/app";
-import { 
-  getAuth, 
-  sendSignInLinkToEmail, 
-  sendPasswordResetEmail, 
-  createUserWithEmailAndPassword 
-} from "firebase/auth";
 import { firebaseConfig } from "./firebaseConfig.js";
 
-// Dedicated secondary Firebase app so inviting users never overwrites or interferes with the logged-in Admin session
-let secondaryAuthApp = null;
-
-function getSecondaryAuth() {
-  if (typeof window === "undefined") return null;
-  try {
-    if (!secondaryAuthApp) {
-      const existing = getApps().find(a => a.name === "ApexSecondaryAuth");
-      secondaryAuthApp = existing || initializeApp(firebaseConfig, "ApexSecondaryAuth");
-    }
-    return getAuth(secondaryAuthApp);
-  } catch (e) {
-    console.warn("Could not initialize secondary Firebase auth app:", e);
-    return null;
-  }
-}
-
 /**
- * Dispatches an official activation email directly from Google Firebase Authentication servers.
- * Free Spark plan supported, zero third-party API keys required.
+ * Dispatches an official activation email automatically and directly from Google Firebase servers.
+ * Pure background delivery — no user popups, no manual Gmail compose windows required.
  */
 export async function sendFirebaseActivationEmail({ recipientEmail, recipientName, role, activationUrl, tempCode }) {
   if (!recipientEmail) {
@@ -34,58 +10,78 @@ export async function sendFirebaseActivationEmail({ recipientEmail, recipientNam
   }
 
   const cleanEmail = recipientEmail.trim().toLowerCase();
-  const authInstance = getSecondaryAuth();
+  const apiKey = firebaseConfig.apiKey;
 
-  if (!authInstance) {
-    return { success: false, error: "Firebase Authentication instance is not available." };
+  if (!apiKey) {
+    return { success: false, error: "Firebase API Key is missing." };
   }
 
-  const redirectUrl = activationUrl || `https://apex-education-forum.web.app/?email=${encodeURIComponent(cleanEmail)}`;
+  const redirectUrl = activationUrl || `https://apex-education-forum.web.app/?activate=${tempCode}&email=${encodeURIComponent(cleanEmail)}`;
 
-  const actionCodeSettings = {
-    url: redirectUrl,
-    handleCodeInApp: true
-  };
-
-  // 1. Ensure user exists in Firebase Auth so Google can dispatch the password reset / account activation email
-  const tempInitialKey = `Apex#${Math.floor(100000 + Math.random() * 900000)}!Init`;
   try {
-    await createUserWithEmailAndPassword(authInstance, cleanEmail, tempInitialKey);
-  } catch (createErr) {
-    // If auth/email-already-in-use, that's fine - account exists and we can proceed to send
-    if (createErr.code !== "auth/email-already-in-use") {
-      console.warn("Firebase user provision note:", createErr.code, createErr.message);
-    }
-  }
+    // 1. Call Google Firebase Identity Toolkit sendOobCode endpoint directly
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        requestType: "PASSWORD_RESET",
+        email: cleanEmail,
+        continueUrl: redirectUrl
+      })
+    });
 
-  // 2. Primary Firebase Method: sendPasswordResetEmail
-  // Google sends an official email from noreply@apex-education-forum.firebaseapp.com
-  try {
-    await sendPasswordResetEmail(authInstance, cleanEmail, actionCodeSettings);
-    return {
-      success: true,
-      method: "firebase_password_reset",
-      sender: "Google Firebase (noreply@apex-education-forum.firebaseapp.com)",
-      message: `Official activation email sent directly to ${cleanEmail} via Google Firebase.`
-    };
-  } catch (resetErr) {
-    console.warn("sendPasswordResetEmail failed, attempting sendSignInLinkToEmail:", resetErr.code, resetErr.message);
+    const data = await response.json();
 
-    // 3. Fallback Firebase Method: sendSignInLinkToEmail (Passwordless magic link)
-    try {
-      await sendSignInLinkToEmail(authInstance, cleanEmail, actionCodeSettings);
-      return {
-        success: true,
-        method: "firebase_signin_link",
-        sender: "Google Firebase (noreply@apex-education-forum.firebaseapp.com)",
-        message: `Sign-in activation link sent directly to ${cleanEmail} via Google Firebase.`
-      };
-    } catch (linkErr) {
-      console.error("Firebase direct email dispatch error:", linkErr.code, linkErr.message);
+    if (!response.ok || data.error) {
+      const errorMsg = data?.error?.message || "Firebase dispatch failed";
+      
+      if (errorMsg === "OPERATION_NOT_ALLOWED" || errorMsg === "PASSWORD_LOGIN_DISABLED") {
+        return {
+          success: false,
+          code: "PROVIDER_DISABLED",
+          error: "Firebase Email provider is disabled. Enable 'Email/Password' in Firebase Console > Authentication > Sign-in method."
+        };
+      }
+
+      // Try without continueUrl if continueUrl domain check was triggered
+      const retryResponse = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestType: "PASSWORD_RESET",
+          email: cleanEmail
+        })
+      });
+      const retryData = await retryResponse.json();
+
+      if (retryResponse.ok && retryData.email) {
+        return {
+          success: true,
+          method: "firebase_automated_oob",
+          sender: "Google Firebase (noreply@apex-education-forum.firebaseapp.com)",
+          message: `Official activation email sent automatically to ${cleanEmail} via Google Firebase.`
+        };
+      }
+
       return {
         success: false,
-        error: linkErr.message || resetErr.message || "Firebase failed to dispatch email."
+        error: retryData?.error?.message || errorMsg
       };
     }
+
+    return {
+      success: true,
+      method: "firebase_automated_oob",
+      sender: "Google Firebase (noreply@apex-education-forum.firebaseapp.com)",
+      message: `Official activation email sent automatically to ${cleanEmail} via Google Firebase.`
+    };
+  } catch (err) {
+    console.error("Automated Firebase email error:", err);
+    return {
+      success: false,
+      error: err.message || "Network error communicating with Google Firebase."
+    };
   }
 }

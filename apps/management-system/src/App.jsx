@@ -1663,41 +1663,15 @@ export default function App() {
                           <td style={{ padding: "16px", textAlign: "right" }}>
                             <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
                               {isPendingActivation && std.email && (
-                                <>
-                                  {gmailComposeLink && (
-                                    <a
-                                      href={gmailComposeLink}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      style={{
-                                        padding: "6px 8px",
-                                        borderRadius: "6px",
-                                        background: "rgba(239, 68, 68, 0.15)",
-                                        border: "1px solid rgba(239, 68, 68, 0.3)",
-                                        color: "#fca5a5",
-                                        textDecoration: "none",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: "4px",
-                                        fontSize: "0.72rem",
-                                        fontWeight: 600
-                                      }}
-                                      title="Open Pre-Filled Invitation in Gmail Web"
-                                    >
-                                      <ExternalLink size={12} />
-                                      <span>Gmail</span>
-                                    </a>
-                                  )}
-                                  <button
-                                    onClick={() => handleResendInvite(std.email, std.name, "student")}
-                                    className="btn-secondary"
-                                    style={{ padding: "6px 10px", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#38bdf8" }}
-                                    title="Resend Activation Email (EmailJS)"
-                                  >
-                                    <RefreshCw size={12} />
-                                    <span>Resend</span>
-                                  </button>
-                                </>
+                                <button
+                                  onClick={() => handleResendInvite(std.email, std.name, "student")}
+                                  className="btn-secondary"
+                                  style={{ padding: "6px 12px", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "5px", color: "#38bdf8" }}
+                                  title="Resend Activation Email automatically via Firebase"
+                                >
+                                  <RefreshCw size={12} />
+                                  <span>Resend Activation Email</span>
+                                </button>
                               )}
 
                               {balance > 0 ? (
@@ -1825,43 +1799,17 @@ export default function App() {
                       {isPending && (
                         <div style={{ marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                           <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                            Code: <strong style={{ color: "#38bdf8" }}>{inv?.tempCode || "Generated"}</strong>
+                            Security Code: <strong style={{ color: "#38bdf8" }}>{inv?.tempCode || "Generated"}</strong>
                           </span>
-                          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                            {gmailComposeLink && (
-                              <a
-                                href={gmailComposeLink}
-                                target="_blank"
-                                rel="noreferrer"
-                                style={{
-                                  padding: "5px 10px",
-                                  fontSize: "0.74rem",
-                                  borderRadius: "6px",
-                                  background: "rgba(239, 68, 68, 0.15)",
-                                  border: "1px solid rgba(239, 68, 68, 0.3)",
-                                  color: "#fca5a5",
-                                  textDecoration: "none",
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: "4px",
-                                  fontWeight: 600
-                                }}
-                                title="Open Pre-Filled Invitation in Gmail Web"
-                              >
-                                <ExternalLink size={12} />
-                                <span>Send via Gmail</span>
-                              </a>
-                            )}
-                            <button
-                              onClick={() => handleResendInvite(t.email, t.name, "instructor")}
-                              className="btn-secondary"
-                              style={{ padding: "5px 10px", fontSize: "0.74rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#38bdf8" }}
-                              title="Resend Activation Email (EmailJS)"
-                            >
-                              <RefreshCw size={12} />
-                              <span>Resend</span>
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => handleResendInvite(t.email, t.name, "instructor")}
+                            className="btn-secondary"
+                            style={{ padding: "5px 12px", fontSize: "0.74rem", display: "inline-flex", alignItems: "center", gap: "5px", color: "#38bdf8" }}
+                            title="Resend Activation Email automatically via Firebase"
+                          >
+                            <RefreshCw size={12} />
+                            <span>Resend Activation Email</span>
+                          </button>
                         </div>
                       )}
                     </div>
@@ -2998,7 +2946,7 @@ export default function App() {
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
                 <button type="button" onClick={() => setShowTeacherModal(false)} className="btn-secondary">Cancel</button>
                 <button type="submit" disabled={isInvitingTeacher} className="btn-primary">
-                  {isInvitingTeacher ? "Dispatching Email..." : "Dispatch Invitation Email"}
+                  {isInvitingTeacher ? "Sending Email Automatically via Firebase..." : "Invite Faculty (Auto-Send via Firebase)"}
                 </button>
               </div>
             </form>
@@ -3109,7 +3057,7 @@ export default function App() {
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
                 <button type="button" onClick={() => setShowEnrollStudentModal(false)} className="btn-secondary">Cancel</button>
                 <button type="submit" disabled={isEnrollingStudent} className="btn-primary">
-                  {isEnrollingStudent ? "Dispatching..." : "Enroll & Dispatch Activation Email"}
+                  {isEnrollingStudent ? "Sending Email Automatically via Firebase..." : "Enroll Student (Auto-Send via Firebase)"}
                 </button>
               </div>
             </form>
