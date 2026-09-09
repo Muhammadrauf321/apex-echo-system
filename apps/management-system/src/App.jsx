@@ -8,14 +8,18 @@ import {
   getInquiries, 
   updateInquiryStatus, 
   issueCertificate,
+  getCertificates,
   getExams,
   createExam,
   updateExamQuestions,
   submitExamPaper,
   approveExam,
-  requestExamRevision
+  requestExamRevision,
+  getTeachers,
+  addTeacher,
+  getStudents,
+  saveStudents
 } from "@shared/dataStore.js";
-import { DEMO_USERS, SEED_CERTIFICATES } from "@shared/seedData.js";
 import { BATCH_SLOTS, FEE_STATUS, ROLES, ROLE_LABELS, EXAM_STATUS, EXAM_STATUS_LABELS } from "@shared/constants.js";
 import confetti from "canvas-confetti";
 import { 
@@ -38,87 +42,40 @@ import {
   X,
   FileText,
   Lock,
-  Unlock,
   Send,
   RotateCcw,
   BookOpen,
   Edit3,
   Trash2,
-  HelpCircle,
-  Code2,
   ShieldCheck,
   Eye,
   AlertTriangle,
-  GraduationCap
+  UserPlus
 } from "lucide-react";
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(getCurrentUser());
 
-  // Role Checks
+  // Role Checks - 100% Strict Role-Based Isolation
   const isAdmin = currentUser?.role === ROLES.DIRECTOR || currentUser?.role === ROLES.MANAGER;
   const isTeacher = currentUser?.role === ROLES.INSTRUCTOR;
   const isStudent = currentUser?.role === ROLES.STUDENT;
 
-  // Initial active tab based on role
-  const [activeTab, setActiveTab] = useState(isAdmin ? "overview" : isTeacher ? "exams" : "exams");
+  // Active Tab per role
+  const [activeTab, setActiveTab] = useState(isAdmin ? "overview" : isTeacher ? "exams" : "my_schedule");
 
-  // Core Data State
+  // Real Dynamic Data (Zero Mock / Zero Seed Data)
   const [courses] = useState(getCourses());
   const [batches, setBatches] = useState(getBatches());
   const [inquiries, setInquiries] = useState(getInquiries());
   const [exams, setExams] = useState(getExams());
-  const [examFilter, setExamFilter] = useState("all");
+  const [teachers, setTeachers] = useState(getTeachers());
+  const [students, setStudents] = useState(getStudents());
+  const [certificates, setCertificates] = useState(getCertificates());
 
-  const [students, setStudents] = useState([
-    {
-      id: "std_01",
-      name: "Hamza Tariq",
-      phone: "+92 301 5554321",
-      course: "Full-Stack Web Development (MERN)",
-      batchCode: "FSWD-B14",
-      totalFee: 28000,
-      paidFee: 18000,
-      status: FEE_STATUS.PARTIAL,
-      attendance: 94
-    },
-    {
-      id: "std_02",
-      name: "Zainab Fatima",
-      phone: "+92 345 1112233",
-      course: "Spoken English & Fluency Mastery",
-      batchCode: "ENG-B22",
-      totalFee: 15000,
-      paidFee: 15000,
-      status: FEE_STATUS.PAID,
-      attendance: 98
-    },
-    {
-      id: "std_03",
-      name: "Usman Ghani",
-      phone: "+92 333 4445566",
-      course: "Python Programming, Data Science & AI",
-      batchCode: "PY-B08",
-      totalFee: 24000,
-      paidFee: 12000,
-      status: FEE_STATUS.PARTIAL,
-      attendance: 88
-    },
-    {
-      id: "std_04",
-      name: "Ayesha Imran",
-      phone: "+92 322 7778899",
-      course: "IELTS Academic Masterclass",
-      batchCode: "IELTS-B11",
-      totalFee: 22000,
-      paidFee: 22000,
-      status: FEE_STATUS.PAID,
-      attendance: 96
-    }
-  ]);
-
-  // Modals State
+  // Modals
   const [showBatchModal, setShowBatchModal] = useState(false);
+  const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [showFeeModal, setShowFeeModal] = useState(false);
   const [selectedStudentForFee, setSelectedStudentForFee] = useState(null);
   const [feePaymentAmount, setFeePaymentAmount] = useState("");
@@ -128,11 +85,19 @@ export default function App() {
   const [newBatch, setNewBatch] = useState({
     courseId: courses[0]?.id || "",
     batchCode: "",
-    instructor: "Engr. Bilal Ahmed",
-    timeSlot: BATCH_SLOTS[3].label,
+    instructor: "",
+    timeSlot: BATCH_SLOTS[0]?.label || "",
     lab: "Computer Lab 1",
-    startDate: "2026-10-01",
+    startDate: new Date().toISOString().split("T")[0],
     capacity: 25
+  });
+
+  // New Teacher Form State
+  const [newTeacherForm, setNewTeacherForm] = useState({
+    name: "",
+    email: "",
+    department: "IT & Software",
+    phone: ""
   });
 
   // Certificate Issuance State
@@ -140,32 +105,28 @@ export default function App() {
     studentName: "",
     courseTitle: courses[0]?.title || "",
     grade: "A+ with Distinction",
-    instructorName: "Engr. Bilal Ahmed",
-    skills: "React.js, Node.js, Cloud Firestore"
+    instructorName: "",
+    skills: "React, Node.js, Cloud Firestore"
   });
   const [issuedCert, setIssuedCert] = useState(null);
 
   // Attendance Register State
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
-  const [attendanceRecords, setAttendanceRecords] = useState({
-    std_01: "present",
-    std_02: "present",
-    std_03: "absent",
-    std_04: "present"
-  });
+  const [attendanceRecords, setAttendanceRecords] = useState({});
 
-  // --- Examination Modals & Workflow State ---
+  // --- Examination Lifecycle State ---
   const [showScheduleExamModal, setShowScheduleExamModal] = useState(false);
   const [newExamForm, setNewExamForm] = useState({
     title: "",
     courseId: courses[0]?.id || "",
-    batchCode: batches[0]?.batchCode || "",
-    assignedTeacherId: "usr_ins_01",
-    examDate: "2026-10-20",
+    batchCode: "",
+    assignedTeacherId: "",
+    assignedTeacherName: "",
+    examDate: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
     durationMinutes: 90,
     totalMarks: 50,
     passingMarks: 25,
-    instructions: "All questions are compulsory. Use of calculators or unauthorized media is strictly forbidden."
+    instructions: "All questions are compulsory. Electronic devices and unauthorized materials are strictly prohibited."
   });
 
   // Teacher Question Studio Modal
@@ -181,17 +142,17 @@ export default function App() {
   const [reviewExam, setReviewExam] = useState(null);
   const [adminApprovalNote, setAdminApprovalNote] = useState("");
 
-  // Admin Request Revision Modal
+  // Admin Revision Request Modal
   const [revisionModalExam, setRevisionModalExam] = useState(null);
   const [revisionFeedbackText, setRevisionFeedbackText] = useState("");
 
   // Printable Exam Modal
   const [printableExam, setPrintableExam] = useState(null);
 
-  // Status message banner
+  // Status Notification
   const [statusBanner, setStatusBanner] = useState(null);
 
-  // Subscribe to Auth changes
+  // Sync Auth
   useEffect(() => {
     const unsub = subscribeToAuth(u => {
       setCurrentUser(u);
@@ -199,34 +160,50 @@ export default function App() {
     return unsub;
   }, []);
 
-  // Update active tab when role changes
+  // Ensure active tab matches role
   useEffect(() => {
-    if (isTeacher) {
-      if (activeTab === "overview" || activeTab === "fees" || activeTab === "certificates") {
+    if (isAdmin) {
+      if (activeTab === "my_schedule" || activeTab === "attendance") {
+        setActiveTab("overview");
+      }
+    } else if (isTeacher) {
+      if (activeTab === "overview" || activeTab === "fees" || activeTab === "certificates" || activeTab === "faculty") {
         setActiveTab("exams");
       }
     } else if (isStudent) {
-      if (activeTab === "overview" || activeTab === "fees" || activeTab === "certificates") {
-        setActiveTab("exams");
+      if (activeTab === "overview" || activeTab === "fees" || activeTab === "certificates" || activeTab === "faculty") {
+        setActiveTab("my_schedule");
       }
     }
-  }, [currentUser, isTeacher, isStudent]);
+  }, [currentUser, isAdmin, isTeacher, isStudent]);
 
-  // Listen to inquiries changes
+  // Sync data store listeners
   useEffect(() => {
-    const handleInqChange = () => setInquiries(getInquiries());
-    window.addEventListener("apex_inquiries_changed", handleInqChange);
-    return () => window.removeEventListener("apex_inquiries_changed", handleInqChange);
+    const handleInq = () => setInquiries(getInquiries());
+    const handleBatches = () => setBatches(getBatches());
+    const handleExams = () => setExams(getExams());
+    const handleTeachers = () => setTeachers(getTeachers());
+    const handleStudents = () => setStudents(getStudents());
+    const handleCerts = () => setCertificates(getCertificates());
+
+    window.addEventListener("apex_inquiries_changed", handleInq);
+    window.addEventListener("apex_batches_changed", handleBatches);
+    window.addEventListener("apex_exams_changed", handleExams);
+    window.addEventListener("apex_teachers_changed", handleTeachers);
+    window.addEventListener("apex_students_changed", handleStudents);
+    window.addEventListener("apex_certificates_changed", handleCerts);
+
+    return () => {
+      window.removeEventListener("apex_inquiries_changed", handleInq);
+      window.removeEventListener("apex_batches_changed", handleBatches);
+      window.removeEventListener("apex_exams_changed", handleExams);
+      window.removeEventListener("apex_teachers_changed", handleTeachers);
+      window.removeEventListener("apex_students_changed", handleStudents);
+      window.removeEventListener("apex_certificates_changed", handleCerts);
+    };
   }, []);
 
-  // Listen to exams changes
-  useEffect(() => {
-    const handleExamsChange = () => setExams(getExams());
-    window.addEventListener("apex_exams_changed", handleExamsChange);
-    return () => window.removeEventListener("apex_exams_changed", handleExamsChange);
-  }, []);
-
-  // Auto clear status banner
+  // Banner auto-dismiss
   useEffect(() => {
     if (statusBanner) {
       const t = setTimeout(() => setStatusBanner(null), 5000);
@@ -234,30 +211,53 @@ export default function App() {
     }
   }, [statusBanner]);
 
+  // Handle Admission Inquiry Approval
   const handleApproveInquiry = (inq) => {
     updateInquiryStatus(inq.id, "approved");
-    const newStudent = {
-      id: `std_${Date.now()}`,
+    const newStd = {
+      id: `std_${Date.now().toString().slice(-4)}`,
       name: inq.name,
-      phone: inq.phone,
+      phone: inq.phone || "",
       course: inq.courseTitle,
-      batchCode: "Pending Allocation",
+      batchCode: inq.preferredSlot || "Assigned Soon",
       totalFee: 20000,
       paidFee: 0,
       status: FEE_STATUS.PENDING,
       attendance: 100
     };
-    setStudents([newStudent, ...students]);
+    const updated = [newStd, ...students];
+    setStudents(updated);
+    saveStudents(updated);
+
+    setStatusBanner({
+      type: "success",
+      message: `Admission approved for ${inq.name}. Enrolled into active student register.`
+    });
   };
 
+  // Handle Add Teacher
+  const handleCreateTeacher = (e) => {
+    e.preventDefault();
+    if (!newTeacherForm.name || !newTeacherForm.email) return;
+    addTeacher(newTeacherForm);
+    setTeachers(getTeachers());
+    setShowTeacherModal(false);
+    setNewTeacherForm({ name: "", email: "", department: "IT & Software", phone: "" });
+    setStatusBanner({
+      type: "success",
+      message: `Teacher ${newTeacherForm.name} registered. They can now be assigned to batches and question papers.`
+    });
+  };
+
+  // Handle Schedule Batch
   const handleCreateBatch = (e) => {
     e.preventDefault();
     const course = courses.find(c => c.id === newBatch.courseId);
     createBatch({
       courseId: newBatch.courseId,
-      courseTitle: course ? course.title : "Course",
+      courseTitle: course ? course.title : "Program Course",
       batchCode: newBatch.batchCode || `BAT-${Math.floor(100 + Math.random() * 900)}`,
-      instructor: newBatch.instructor,
+      instructor: newBatch.instructor || "Faculty Assigned",
       timeSlot: newBatch.timeSlot,
       lab: newBatch.lab,
       startDate: newBatch.startDate,
@@ -265,8 +265,13 @@ export default function App() {
     });
     setBatches(getBatches());
     setShowBatchModal(false);
+    setStatusBanner({
+      type: "success",
+      message: "New batch scheduled and added to official timetable."
+    });
   };
 
+  // Handle Fee Payment Record
   const handleRecordPayment = (e) => {
     e.preventDefault();
     if (!selectedStudentForFee || !feePaymentAmount) return;
@@ -285,6 +290,7 @@ export default function App() {
     });
 
     setStudents(updated);
+    saveStudents(updated);
     
     setReceiptToPrint({
       receiptNo: `APEX-RCP-${Date.now().toString().slice(-6)}`,
@@ -300,6 +306,7 @@ export default function App() {
     setFeePaymentAmount("");
   };
 
+  // Handle Issue Certificate
   const handleIssueCertificate = (e) => {
     e.preventDefault();
     if (!certForm.studentName) return;
@@ -308,35 +315,31 @@ export default function App() {
       studentName: certForm.studentName,
       courseTitle: certForm.courseTitle,
       grade: certForm.grade,
-      instructorName: certForm.instructorName,
+      instructorName: certForm.instructorName || "Faculty Director",
       skills: certForm.skills.split(",").map(s => s.trim())
     });
 
     setIssuedCert(cert);
-    confetti({
-      particleCount: 120,
-      spread: 70,
-      origin: { y: 0.6 }
-    });
+    setCertificates(getCertificates());
+    confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
   };
 
   // --- Examination Handlers ---
 
-  // Admin schedules exam
+  // Admin schedules exam (Starts at Awaiting Teacher Submission, Admin approval locked)
   const handleScheduleExamSubmit = (e) => {
     e.preventDefault();
     const course = courses.find(c => c.id === newExamForm.courseId);
-    const teacher = DEMO_USERS.find(u => u.uid === newExamForm.assignedTeacherId);
 
     createExam({
       title: newExamForm.title,
       courseId: newExamForm.courseId,
-      courseTitle: course ? course.title : "Program Exam",
-      batchCode: newExamForm.batchCode,
+      courseTitle: course ? course.title : "Examination",
+      batchCode: newExamForm.batchCode || (batches[0]?.batchCode || "General Batch"),
       assignedTeacherId: newExamForm.assignedTeacherId,
-      assignedTeacherName: teacher ? teacher.name : "Assigned Instructor",
+      assignedTeacherName: newExamForm.assignedTeacherName || "Assigned Faculty",
       createdById: currentUser?.uid || "admin",
-      createdByName: currentUser?.name || "Executive Admin",
+      createdByName: currentUser?.name || "Muhammad Rauf (Director)",
       examDate: newExamForm.examDate,
       durationMinutes: Number(newExamForm.durationMinutes),
       totalMarks: Number(newExamForm.totalMarks),
@@ -348,11 +351,11 @@ export default function App() {
     setShowScheduleExamModal(false);
     setStatusBanner({
       type: "success",
-      message: `Exam scheduled successfully. Rotation handed over to ${teacher?.name || "Teacher"}. Admin question approval access is locked until submission.`
+      message: `Exam scheduled successfully. Question formulation delegated to ${newExamForm.assignedTeacherName}. Admin approval access is locked until submission.`
     });
   };
 
-  // Teacher opens Question Authoring Studio
+  // Teacher Question Studio
   const handleOpenAuthoringStudio = (exam) => {
     setAuthoringExam(exam);
     setAuthoringQuestions([...(exam.questions || [])]);
@@ -361,11 +364,10 @@ export default function App() {
     setNewQuestionMarks(5);
   };
 
-  // Teacher adds question
   const handleAddQuestion = () => {
     if (!newQuestionText.trim()) return;
 
-    const questionObj = {
+    const q = {
       id: `q_${Date.now()}`,
       questionText: newQuestionText.trim(),
       type: newQuestionType,
@@ -374,29 +376,27 @@ export default function App() {
       correctOption: newQuestionType === "mcq" ? newCorrectOption : null
     };
 
-    const updated = [...authoringQuestions, questionObj];
+    const updated = [...authoringQuestions, q];
     setAuthoringQuestions(updated);
     updateExamQuestions(authoringExam.id, updated);
     setNewQuestionText("");
     setNewMcqOptions(["", "", "", ""]);
   };
 
-  // Teacher deletes question
   const handleDeleteQuestion = (qId) => {
     const updated = authoringQuestions.filter(q => q.id !== qId);
     setAuthoringQuestions(updated);
     updateExamQuestions(authoringExam.id, updated);
   };
 
-  // Teacher Submits Paper to Director (ROTATION: LOCKS TEACHER, UNLOCKS ADMIN)
+  // Teacher Submits Paper to Admin (LOCKS TEACHER, UNLOCKS ADMIN)
   const handleSubmitPaperToAdmin = () => {
     if (!authoringExam) return;
     if (authoringQuestions.length === 0) {
-      alert("Please add at least one question before submitting.");
+      alert("Please formulate at least one question before submitting.");
       return;
     }
 
-    // Save final questions first
     updateExamQuestions(authoringExam.id, authoringQuestions);
     submitExamPaper(authoringExam.id);
     setAuthoringExam(null);
@@ -404,11 +404,11 @@ export default function App() {
 
     setStatusBanner({
       type: "success",
-      message: "Question Paper submitted to Director! Your editing and submission access is now LOCKED until Admin review."
+      message: "Question Paper submitted to Director for approval. Your authoring access is now LOCKED until review."
     });
   };
 
-  // Admin Approves Exam (FINAL ROTATION: APPROVED & PUBLISHED)
+  // Admin Approves Exam (PUBLISHED & PRINTABLE)
   const handleAdminApproveExam = () => {
     if (!reviewExam) return;
     approveExam(reviewExam.id, adminApprovalNote || "Approved and verified by Executive Director.");
@@ -416,19 +416,14 @@ export default function App() {
     setAdminApprovalNote("");
     setExams(getExams());
 
-    confetti({
-      particleCount: 140,
-      spread: 80,
-      origin: { y: 0.5 }
-    });
-
+    confetti({ particleCount: 140, spread: 80, origin: { y: 0.5 } });
     setStatusBanner({
       type: "success",
-      message: "Exam paper approved and officially published! Paper is now finalized and printable."
+      message: "Exam paper approved and officially published. Ready for conduction and printing."
     });
   };
 
-  // Admin Requests Revision (ROTATION: UNLOCKS TEACHER WITH FEEDBACK)
+  // Admin Requests Revision (ROTATES BACK TO TEACHER)
   const handleAdminSubmitRevision = () => {
     if (!revisionModalExam || !revisionFeedbackText.trim()) return;
     requestExamRevision(revisionModalExam.id, revisionFeedbackText.trim());
@@ -438,62 +433,54 @@ export default function App() {
 
     setStatusBanner({
       type: "warning",
-      message: "Paper returned to instructor with revision notes. Editing has been re-enabled for the teacher."
+      message: "Paper returned to instructor with revision instructions. Editing has been re-enabled for teacher."
     });
   };
 
-  // Filter exams based on Role & Status Filter
-  const filteredExams = exams.filter(e => {
-    // If teacher: only view exams assigned to this teacher
-    if (isTeacher && e.assignedTeacherId !== currentUser?.uid && e.assignedTeacherName !== currentUser?.name) {
-      return false;
+  // Filter exams strictly by Role
+  const visibleExams = exams.filter(e => {
+    if (isTeacher) {
+      // Teacher only sees exams assigned to their email or name
+      return e.assignedTeacherEmail === currentUser?.email || 
+             e.assignedTeacherName?.toLowerCase() === currentUser?.name?.toLowerCase() ||
+             e.assignedTeacherId === currentUser?.uid;
     }
-    // Filter by tab selector
-    if (examFilter === "all") return true;
-    return e.status === examFilter;
+    // Admin sees all exams
+    return true;
   });
 
   const totalFeeCollected = students.reduce((acc, s) => acc + s.paidFee, 0);
   const totalFeeExpected = students.reduce((acc, s) => acc + s.totalFee, 0);
 
-  // Dynamic Navigation Tabs per Role
+  // Dynamic Navigation Tabs strictly by Role
   const roleTabs = [];
   if (isAdmin) {
     roleTabs.push(
       { id: "overview", label: "Executive Overview", icon: LayoutDashboard },
       { id: "batches", label: "Batches & Timetables", icon: Calendar },
-      { id: "fees", label: "Admissions & Fee Tracking", icon: DollarSign },
+      { id: "fees", label: "Admissions & Fees", icon: DollarSign },
       { id: "exams", label: "Examination Master Control", icon: FileText, badge: exams.filter(e => e.status === EXAM_STATUS.PENDING_ADMIN).length },
+      { id: "faculty", label: "Faculty Directory", icon: Users },
       { id: "certificates", label: "Digital Certificates", icon: Award }
     );
   } else if (isTeacher) {
-    const pendingMyAction = exams.filter(e => 
-      (e.assignedTeacherId === currentUser?.uid || e.assignedTeacherName === currentUser?.name) && 
-      (e.status === EXAM_STATUS.PENDING_TEACHER || e.status === EXAM_STATUS.REVISION)
-    ).length;
-
     roleTabs.push(
+      { id: "exams", label: "My Exam Papers", icon: FileText, badge: visibleExams.filter(e => e.status === EXAM_STATUS.PENDING_TEACHER || e.status === EXAM_STATUS.REVISION).length },
       { id: "batches", label: "My Assigned Batches", icon: Calendar },
-      { id: "attendance", label: "Attendance Register", icon: CheckSquare },
-      { id: "exams", label: "My Exam Papers (Authoring)", icon: FileText, badge: pendingMyAction }
+      { id: "attendance", label: "Class Attendance Register", icon: CheckSquare }
     );
   } else {
     // Student
     roleTabs.push(
-      { id: "batches", label: "My Schedule & Batch", icon: Calendar },
+      { id: "my_schedule", label: "My Batch & Schedule", icon: Calendar },
       { id: "attendance", label: "My Attendance Status", icon: CheckSquare },
       { id: "exams", label: "Scheduled Examinations", icon: FileText }
     );
   }
 
-  // Teacher assigned batches
-  const teacherBatches = isTeacher 
-    ? batches.filter(b => b.instructor.toLowerCase().includes(currentUser?.name?.split(" ")[0]?.toLowerCase() || ""))
-    : batches;
-
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "var(--bg-dark)", color: "var(--text-main)" }}>
-      {/* Ecosystem Global Navigation */}
+      {/* Ecosystem Global Navigation (No arbitrary role toggles) */}
       <EcosystemNav currentApp="management" />
 
       {/* Main Container */}
@@ -531,7 +518,7 @@ export default function App() {
             </h1>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "4px" }}>
               <span style={{ color: "var(--text-muted)", fontSize: "0.92rem" }}>
-                Active Identity: <strong style={{ color: "#ffffff" }}>{currentUser?.name}</strong>
+                Logged In: <strong style={{ color: "#ffffff" }}>{currentUser?.name}</strong>
               </span>
               <span style={{
                 fontSize: "0.72rem",
@@ -543,10 +530,7 @@ export default function App() {
                 fontWeight: 800,
                 textTransform: "uppercase"
               }}>
-                {ROLE_LABELS[currentUser?.role] || currentUser?.role}
-              </span>
-              <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
-                ({currentUser?.uid})
+                {isAdmin ? "ADMIN (DIRECTOR)" : isTeacher ? "TEACHER" : "STUDENT"}
               </span>
             </div>
           </div>
@@ -560,7 +544,7 @@ export default function App() {
                   style={{ fontSize: "0.88rem", background: "linear-gradient(135deg, #0ea5e9, #0284c7)" }}
                 >
                   <Plus size={16} />
-                  <span>Schedule New Exam</span>
+                  <span>Schedule Exam</span>
                 </button>
                 <button
                   onClick={() => setShowBatchModal(true)}
@@ -568,24 +552,14 @@ export default function App() {
                   style={{ fontSize: "0.88rem" }}
                 >
                   <Plus size={16} />
-                  <span>Schedule New Batch</span>
+                  <span>Schedule Batch</span>
                 </button>
               </>
-            )}
-            {isTeacher && (
-              <button
-                onClick={() => setActiveTab("exams")}
-                className="btn-primary"
-                style={{ fontSize: "0.88rem", background: "linear-gradient(135deg, #10b981, #059669)" }}
-              >
-                <Edit3 size={16} />
-                <span>My Assigned Question Papers</span>
-              </button>
             )}
           </div>
         </div>
 
-        {/* Dynamic Navigation Tabs based on Role */}
+        {/* Dynamic Navigation Tabs strictly by Role */}
         <div style={{
           display: "flex",
           background: "rgba(16, 22, 36, 0.8)",
@@ -638,10 +612,12 @@ export default function App() {
           })}
         </div>
 
-        {/* 1. EXECUTIVE OVERVIEW TAB (ADMIN ONLY) */}
+        {/* ======================================================== */}
+        {/* 1. EXECUTIVE OVERVIEW (ADMIN ONLY)                        */}
+        {/* ======================================================== */}
         {activeTab === "overview" && isAdmin && (
           <div>
-            {/* KPI Stat Cards */}
+            {/* Real KPI Cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px", marginBottom: "32px" }}>
               <div className="glass-panel" style={{ padding: "22px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
@@ -649,103 +625,117 @@ export default function App() {
                   <Users size={20} color="#06b6d4" />
                 </div>
                 <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#ffffff" }}>{students.length}</div>
-                <div style={{ fontSize: "0.78rem", color: "#34d399", marginTop: "4px" }}>+4 enrolled this week</div>
+                <div style={{ fontSize: "0.78rem", color: "var(--text-dim)", marginTop: "4px" }}>
+                  {students.length === 0 ? "No students enrolled yet" : `${students.length} enrolled in batches`}
+                </div>
               </div>
 
               <div className="glass-panel" style={{ padding: "22px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                  <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>Active Batches</span>
+                  <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>Scheduled Batches</span>
                   <Calendar size={20} color="#6366f1" />
                 </div>
                 <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#ffffff" }}>{batches.length}</div>
-                <div style={{ fontSize: "0.78rem", color: "#818cf8", marginTop: "4px" }}>IT & Language labs running</div>
-              </div>
-
-              <div className="glass-panel" style={{ padding: "22px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                  <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>Exams in Rotation</span>
-                  <FileText size={20} color="#38bdf8" />
-                </div>
-                <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#ffffff" }}>{exams.length}</div>
-                <div style={{ fontSize: "0.78rem", color: "#38bdf8", marginTop: "4px" }}>
-                  {exams.filter(e => e.status === EXAM_STATUS.PENDING_ADMIN).length} ready for review
+                <div style={{ fontSize: "0.78rem", color: "var(--text-dim)", marginTop: "4px" }}>
+                  {batches.length === 0 ? "No batches created" : "Active labs running"}
                 </div>
               </div>
 
               <div className="glass-panel" style={{ padding: "22px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                  <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>Fee Recovery Rate</span>
-                  <TrendingUp size={20} color="#10b981" />
+                  <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>Website Admissions</span>
+                  <AlertCircle size={20} color="#f59e0b" />
                 </div>
-                <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#ffffff" }}>
-                  {Math.round((totalFeeCollected / (totalFeeExpected || 1)) * 100)}%
+                <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#ffffff" }}>{inquiries.length}</div>
+                <div style={{ fontSize: "0.78rem", color: "#fbbf24", marginTop: "4px" }}>
+                  {inquiries.filter(i => i.status === "pending").length} pending approval
                 </div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: "22px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>Registered Teachers</span>
+                  <UserCheck size={20} color="#10b981" />
+                </div>
+                <div style={{ fontSize: "2.2rem", fontWeight: 800, color: "#ffffff" }}>{teachers.length}</div>
                 <div style={{ fontSize: "0.78rem", color: "#34d399", marginTop: "4px" }}>
-                  PKR {totalFeeCollected.toLocaleString()} collected
+                  Assigned teaching faculty
                 </div>
               </div>
             </div>
 
-            {/* Inquiries & Batches Dual Column */}
+            {/* Inquiries & Batches Grid */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(450px, 1fr))", gap: "28px" }}>
-              {/* Online Admission Applications */}
+              {/* Admissions Inquiries */}
               <div className="glass-panel" style={{ padding: "24px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-                  <h3 style={{ fontSize: "1.15rem", fontWeight: 700 }}>Incoming Website Admissions</h3>
+                  <h3 style={{ fontSize: "1.15rem", fontWeight: 700 }}>Online Admission Inquiries</h3>
                   <span className="badge badge-amber">{inquiries.filter(i => i.status === "pending").length} Pending</span>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  {inquiries.map((inq) => (
-                    <div
-                      key={inq.id}
-                      style={{
-                        padding: "14px",
-                        background: "rgba(0,0,0,0.25)",
-                        border: "1px solid var(--border-subtle)",
-                        borderRadius: "10px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center"
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{inq.name}</div>
-                        <div style={{ fontSize: "0.8rem", color: "#38bdf8" }}>{inq.courseTitle}</div>
-                        <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "2px" }}>
-                          Phone: {inq.phone} | Slot: {inq.preferredSlot}
+                {inquiries.length === 0 ? (
+                  <div style={{ padding: "30px", textAlign: "center", color: "var(--text-muted)" }}>
+                    No incoming admission inquiries yet. Applications from the public portal will appear here in real time.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    {inquiries.map((inq) => (
+                      <div
+                        key={inq.id}
+                        style={{
+                          padding: "14px",
+                          background: "rgba(0,0,0,0.25)",
+                          border: "1px solid var(--border-subtle)",
+                          borderRadius: "10px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center"
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{inq.name}</div>
+                          <div style={{ fontSize: "0.8rem", color: "#38bdf8" }}>{inq.courseTitle}</div>
+                          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "2px" }}>
+                            Phone: {inq.phone} | Slot: {inq.preferredSlot}
+                          </div>
+                        </div>
+
+                        <div>
+                          {inq.status === "approved" ? (
+                            <span className="badge badge-emerald">✓ Approved</span>
+                          ) : (
+                            <button
+                              onClick={() => handleApproveInquiry(inq)}
+                              className="btn-primary"
+                              style={{ padding: "6px 12px", fontSize: "0.8rem" }}
+                            >
+                              Approve
+                            </button>
+                          )}
                         </div>
                       </div>
-
-                      <div>
-                        {inq.status === "approved" ? (
-                          <span className="badge badge-emerald">✓ Approved</span>
-                        ) : (
-                          <button
-                            onClick={() => handleApproveInquiry(inq)}
-                            className="btn-primary"
-                            style={{ padding: "6px 12px", fontSize: "0.8rem" }}
-                          >
-                            Approve
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {/* Active Batches Capacity */}
+              {/* Active Batches */}
               <div className="glass-panel" style={{ padding: "24px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-                  <h3 style={{ fontSize: "1.15rem", fontWeight: 700 }}>Batches & Lab Utilization</h3>
-                  <span className="badge badge-cyan">{batches.length} Running</span>
+                  <h3 style={{ fontSize: "1.15rem", fontWeight: 700 }}>Active Batches</h3>
+                  <button onClick={() => setShowBatchModal(true)} className="btn-secondary" style={{ padding: "4px 10px", fontSize: "0.78rem" }}>
+                    <Plus size={14} />
+                    <span>Add</span>
+                  </button>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                  {batches.map((batch) => {
-                    const percent = Math.round((batch.enrolledCount / batch.capacity) * 100);
-                    return (
+                {batches.length === 0 ? (
+                  <div style={{ padding: "30px", textAlign: "center", color: "var(--text-muted)" }}>
+                    No batches scheduled yet. Click <strong>Schedule Batch</strong> above to create the first batch.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                    {batches.map((batch) => (
                       <div
                         key={batch.id}
                         style={{
@@ -760,38 +750,34 @@ export default function App() {
                             {batch.batchCode} - {batch.courseTitle}
                           </span>
                           <span style={{ fontSize: "0.8rem", color: "#38bdf8", fontWeight: 700 }}>
-                            {batch.enrolledCount} / {batch.capacity} Seats ({percent}%)
+                            {batch.enrolledCount} / {batch.capacity} Seats
                           </span>
                         </div>
-
-                        {/* Progress Bar */}
-                        <div style={{ width: "100%", height: "6px", background: "rgba(255,255,255,0.1)", borderRadius: "3px", overflow: "hidden", marginBottom: "8px" }}>
-                          <div style={{ width: `${percent}%`, height: "100%", background: percent > 80 ? "#10b981" : "#6366f1" }} />
-                        </div>
-
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "var(--text-dim)" }}>
                           <span>Trainer: {batch.instructor}</span>
                           <span>Lab: {batch.lab} ({batch.timeSlot})</span>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         )}
 
-        {/* 2. BATCHES & TIMETABLES TAB */}
+        {/* ======================================================== */}
+        {/* 2. BATCHES & TIMETABLES                                   */}
+        {/* ======================================================== */}
         {activeTab === "batches" && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div>
                 <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>
-                  {isTeacher ? "My Assigned Classes & Schedule" : "All Scheduled Batches & Lab Timetables"}
+                  {isAdmin ? "Campus Batches & Timetables" : "My Assigned Classes"}
                 </h2>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                  {isTeacher ? "Showing classes assigned to your instructor profile" : "Comprehensive master timetable across Computer Labs and Language Audio-Visual studios"}
+                  {isAdmin ? "Schedule batches, assign instructors, and allocate lab slots" : "View your assigned classes and schedules"}
                 </p>
               </div>
 
@@ -803,174 +789,231 @@ export default function App() {
               )}
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
-              {(isTeacher ? teacherBatches : batches).map((b) => (
-                <div key={b.id} className="glass-panel" style={{ padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-                      <span className="badge badge-indigo" style={{ fontWeight: 800 }}>{b.batchCode}</span>
-                      <span className="badge badge-emerald">● Active</span>
-                    </div>
-
-                    <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "8px" }}>{b.courseTitle}</h3>
-
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "0.85rem", color: "var(--text-muted)", margin: "14px 0" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <Clock size={15} color="#38bdf8" />
-                        <span>{b.timeSlot}</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <Building size={15} color="#818cf8" />
-                        <span>{b.lab}</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <UserCheck size={15} color="#34d399" />
-                        <span>Instructor: <strong>{b.instructor}</strong></span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
-                      Enrolled: <strong>{b.enrolledCount} / {b.capacity}</strong>
-                    </span>
-                    <button
-                      onClick={() => setActiveTab("attendance")}
-                      className="btn-secondary"
-                      style={{ padding: "6px 12px", fontSize: "0.8rem" }}
-                    >
-                      <span>Attendance</span>
-                      <ChevronRight size={14} />
-                    </button>
-                  </div>
+            {batches.length === 0 ? (
+              <div className="glass-panel" style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
+                <Calendar size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
+                <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>No Batches Scheduled</div>
+                <div style={{ fontSize: "0.85rem", marginTop: "4px" }}>
+                  {isAdmin ? "Click 'New Batch' to add a class and assign an instructor." : "You have not been assigned to any active batch yet."}
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
+                {batches.map((b) => (
+                  <div key={b.id} className="glass-panel" style={{ padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    <div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                        <span className="badge badge-indigo" style={{ fontWeight: 800 }}>{b.batchCode}</span>
+                        <span className="badge badge-emerald">● Active</span>
+                      </div>
+
+                      <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "8px" }}>{b.courseTitle}</h3>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "0.85rem", color: "var(--text-muted)", margin: "14px 0" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <Clock size={15} color="#38bdf8" />
+                          <span>{b.timeSlot}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <Building size={15} color="#818cf8" />
+                          <span>{b.lab}</span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <UserCheck size={15} color="#34d399" />
+                          <span>Instructor: <strong>{b.instructor}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+                        Enrolled: <strong>{b.enrolledCount} / {b.capacity}</strong>
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* 3. ADMISSIONS & FEE TRACKING (ADMIN ONLY) */}
+        {/* ======================================================== */}
+        {/* 3. ADMISSIONS & FEE TRACKING (ADMIN ONLY)                 */}
+        {/* ======================================================== */}
         {activeTab === "fees" && isAdmin && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div>
-                <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>Student Admission & Fee Management</h2>
+                <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>Admissions & Student Accounts</h2>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                  Track outstanding student dues, record fee installments, and print verified digital vouchers
+                  Record student fee payments and generate verified printable receipts
                 </p>
               </div>
             </div>
 
-            <div className="glass-panel" style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.9rem" }}>
-                <thead>
-                  <tr style={{ borderBottom: "1px solid var(--border-subtle)", color: "var(--text-muted)", fontSize: "0.78rem", textTransform: "uppercase" }}>
-                    <th style={{ padding: "16px" }}>Student Name</th>
-                    <th style={{ padding: "16px" }}>Course & Batch</th>
-                    <th style={{ padding: "16px" }}>Total Fee</th>
-                    <th style={{ padding: "16px" }}>Paid Amount</th>
-                    <th style={{ padding: "16px" }}>Balance</th>
-                    <th style={{ padding: "16px" }}>Status</th>
-                    <th style={{ padding: "16px", textAlign: "right" }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students.map((std) => {
-                    const balance = std.totalFee - std.paidFee;
-                    return (
-                      <tr key={std.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                        <td style={{ padding: "16px", fontWeight: 600 }}>
-                          <div>{std.name}</div>
-                          <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{std.phone}</div>
-                        </td>
-                        <td style={{ padding: "16px" }}>
-                          <div>{std.course}</div>
-                          <div style={{ fontSize: "0.75rem", color: "#38bdf8" }}>{std.batchCode}</div>
-                        </td>
-                        <td style={{ padding: "16px" }}>PKR {std.totalFee.toLocaleString()}</td>
-                        <td style={{ padding: "16px", color: "#34d399", fontWeight: 600 }}>PKR {std.paidFee.toLocaleString()}</td>
-                        <td style={{ padding: "16px", color: balance > 0 ? "#f87171" : "var(--text-muted)", fontWeight: 600 }}>
-                          PKR {balance.toLocaleString()}
-                        </td>
-                        <td style={{ padding: "16px" }}>
-                          {std.status === FEE_STATUS.PAID ? (
-                            <span className="badge badge-emerald">Paid Full</span>
-                          ) : std.status === FEE_STATUS.PARTIAL ? (
-                            <span className="badge badge-amber">Partial</span>
-                          ) : (
-                            <span className="badge badge-rose">Pending</span>
-                          )}
-                        </td>
-                        <td style={{ padding: "16px", textAlign: "right" }}>
-                          {balance > 0 ? (
-                            <button
-                              onClick={() => {
-                                setSelectedStudentForFee(std);
-                                setShowFeeModal(true);
-                              }}
-                              className="btn-primary"
-                              style={{ padding: "6px 14px", fontSize: "0.8rem" }}
-                            >
-                              Collect Fee
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => {
-                                setReceiptToPrint({
-                                  receiptNo: `APEX-RCP-${std.id.toUpperCase()}`,
-                                  date: new Date().toLocaleDateString(),
-                                  studentName: std.name,
-                                  course: std.course,
-                                  batchCode: std.batchCode,
-                                  amountPaid: std.totalFee,
-                                  remainingBalance: 0
-                                });
-                              }}
-                              className="btn-secondary"
-                              style={{ padding: "6px 12px", fontSize: "0.8rem" }}
-                            >
-                              <Printer size={14} />
-                              <span>Receipt</span>
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {students.length === 0 ? (
+              <div className="glass-panel" style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
+                <DollarSign size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
+                <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>No Enrolled Students Yet</div>
+                <div style={{ fontSize: "0.85rem", marginTop: "4px" }}>
+                  When admissions are approved from the Overview tab, students will appear here for fee tracking.
+                </div>
+              </div>
+            ) : (
+              <div className="glass-panel" style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.9rem" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border-subtle)", color: "var(--text-muted)", fontSize: "0.78rem", textTransform: "uppercase" }}>
+                      <th style={{ padding: "16px" }}>Student Name</th>
+                      <th style={{ padding: "16px" }}>Course & Batch</th>
+                      <th style={{ padding: "16px" }}>Total Fee</th>
+                      <th style={{ padding: "16px" }}>Paid Amount</th>
+                      <th style={{ padding: "16px" }}>Balance</th>
+                      <th style={{ padding: "16px" }}>Status</th>
+                      <th style={{ padding: "16px", textAlign: "right" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.map((std) => {
+                      const balance = std.totalFee - std.paidFee;
+                      return (
+                        <tr key={std.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ padding: "16px", fontWeight: 600 }}>
+                            <div>{std.name}</div>
+                            <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{std.phone}</div>
+                          </td>
+                          <td style={{ padding: "16px" }}>
+                            <div>{std.course}</div>
+                            <div style={{ fontSize: "0.75rem", color: "#38bdf8" }}>{std.batchCode}</div>
+                          </td>
+                          <td style={{ padding: "16px" }}>PKR {std.totalFee.toLocaleString()}</td>
+                          <td style={{ padding: "16px", color: "#34d399", fontWeight: 600 }}>PKR {std.paidFee.toLocaleString()}</td>
+                          <td style={{ padding: "16px", color: balance > 0 ? "#f87171" : "var(--text-muted)", fontWeight: 600 }}>
+                            PKR {balance.toLocaleString()}
+                          </td>
+                          <td style={{ padding: "16px" }}>
+                            {std.status === FEE_STATUS.PAID ? (
+                              <span className="badge badge-emerald">Paid Full</span>
+                            ) : std.status === FEE_STATUS.PARTIAL ? (
+                              <span className="badge badge-amber">Partial</span>
+                            ) : (
+                              <span className="badge badge-rose">Pending</span>
+                            )}
+                          </td>
+                          <td style={{ padding: "16px", textAlign: "right" }}>
+                            {balance > 0 ? (
+                              <button
+                                onClick={() => {
+                                  setSelectedStudentForFee(std);
+                                  setShowFeeModal(true);
+                                }}
+                                className="btn-primary"
+                                style={{ padding: "6px 14px", fontSize: "0.8rem" }}
+                              >
+                                Collect Fee
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setReceiptToPrint({
+                                    receiptNo: `APEX-RCP-${std.id.toUpperCase()}`,
+                                    date: new Date().toLocaleDateString(),
+                                    studentName: std.name,
+                                    course: std.course,
+                                    batchCode: std.batchCode,
+                                    amountPaid: std.totalFee,
+                                    remainingBalance: 0
+                                  });
+                                }}
+                                className="btn-secondary"
+                                style={{ padding: "6px 12px", fontSize: "0.8rem" }}
+                              >
+                                <Printer size={14} />
+                                <span>Receipt</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {/* 4. EXAMINATION SYSTEM TAB (ROTATIONAL RBAC LIFECYCLE) */}
+        {/* ======================================================== */}
+        {/* 4. FACULTY & TEACHERS DIRECTORY (ADMIN ONLY)              */}
+        {/* ======================================================== */}
+        {activeTab === "faculty" && isAdmin && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <div>
+                <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>Teaching Faculty & Staff Directory</h2>
+                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                  Register instructors so they can be assigned to question papers and class batches
+                </p>
+              </div>
+
+              <button
+                onClick={() => setShowTeacherModal(true)}
+                className="btn-primary"
+                style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                <UserPlus size={16} />
+                <span>Register New Teacher</span>
+              </button>
+            </div>
+
+            {teachers.length === 0 ? (
+              <div className="glass-panel" style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
+                <Users size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
+                <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>No Teachers Registered Yet</div>
+                <div style={{ fontSize: "0.85rem", marginTop: "4px" }}>
+                  Click "Register New Teacher" to add your faculty members.
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
+                {teachers.map(t => (
+                  <div key={t.id} className="glass-panel" style={{ padding: "18px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
+                      <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "rgba(16, 185, 129, 0.2)", color: "#34d399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "1rem" }}>
+                        {t.name[0]}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{t.name}</div>
+                        <div style={{ fontSize: "0.78rem", color: "#38bdf8" }}>{t.department}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-dim)", borderTop: "1px solid var(--border-subtle)", paddingTop: "8px" }}>
+                      <div>Email: <strong style={{ color: "#fff" }}>{t.email}</strong></div>
+                      {t.phone && <div>Phone: {t.phone}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* 5. EXAMINATION SYSTEM (STRICT ROTATIONAL LIFECYCLE)       */}
+        {/* ======================================================== */}
         {activeTab === "exams" && (
           <div>
-            {/* Header & Filter Controls */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px", flexWrap: "wrap", gap: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <h2 style={{ fontSize: "1.4rem", fontWeight: 800 }}>
-                    {isAdmin ? "Institutional Examination Control (Lifecycle)" : isTeacher ? "My Question Papers & Authoring Studio" : "Upcoming Scheduled Examinations"}
-                  </h2>
-                  <span style={{
-                    fontSize: "0.75rem",
-                    padding: "3px 8px",
-                    borderRadius: "6px",
-                    background: "rgba(99, 102, 241, 0.18)",
-                    color: "#818cf8",
-                    border: "1px solid rgba(99,102,241,0.3)",
-                    fontWeight: 700
-                  }}>
-                    Rotational Workflow Active
-                  </span>
-                </div>
-                <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginTop: "4px" }}>
+                <h2 style={{ fontSize: "1.35rem", fontWeight: 800 }}>
+                  {isAdmin ? "Examination Master Control" : isTeacher ? "My Question Papers" : "Upcoming Scheduled Exams"}
+                </h2>
+                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
                   {isAdmin 
-                    ? "Admin schedules exams and delegates question paper formulation to assigned teachers. Question approval is locked until teacher submits."
+                    ? "Schedule exams and assign to instructors. Question approval is locked until teacher submits."
                     : isTeacher 
-                    ? "Formulate questions for your assigned batches. Once you submit the paper, editing access is disabled while under Admin review."
-                    : "Official timetable and instructions for your semester assessments"}
+                    ? "Prepare questions for assigned exams. Submitting paper locks editing until Director review."
+                    : "Official examination schedule and instructions"}
                 </p>
               </div>
 
@@ -981,544 +1024,273 @@ export default function App() {
                   style={{ fontSize: "0.88rem", background: "linear-gradient(135deg, #0ea5e9, #0284c7)" }}
                 >
                   <Plus size={16} />
-                  <span>Schedule New Examination</span>
+                  <span>Schedule Exam</span>
                 </button>
               )}
             </div>
 
-            {/* Lifecycle Informational Banner explaining the exact rotation */}
-            <div style={{
-              background: "rgba(15, 23, 42, 0.6)",
-              border: "1px solid rgba(255, 255, 255, 0.08)",
-              borderRadius: "14px",
-              padding: "16px 20px",
-              marginBottom: "24px",
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: "16px"
-            }}>
-              <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(234, 179, 8, 0.2)", color: "#eab308", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.85rem" }}>
-                  1
-                </div>
-                <div>
-                  <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#eab308" }}>Admin Schedules Exam</div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                    Assigned to Teacher. Admin question access is <strong>LOCKED</strong> until teacher submission.
-                  </div>
+            {/* List of Examinations */}
+            {visibleExams.length === 0 ? (
+              <div className="glass-panel" style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
+                <FileText size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
+                <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>No Examinations Scheduled</div>
+                <div style={{ fontSize: "0.85rem", marginTop: "4px" }}>
+                  {isAdmin 
+                    ? "Click 'Schedule Exam' to set up an examination and delegate question authoring to an instructor."
+                    : "No question papers assigned to your instructor account yet."}
                 </div>
               </div>
-
-              <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(56, 189, 248, 0.2)", color: "#38bdf8", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.85rem" }}>
-                  2
-                </div>
-                <div>
-                  <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#38bdf8" }}>Teacher Authors & Submits</div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                    Teacher authors paper. Upon clicking Submit, Teacher editing is <strong>DISABLED</strong>.
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: "rgba(34, 197, 94, 0.2)", color: "#22c55e", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.85rem" }}>
-                  3
-                </div>
-                <div>
-                  <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#22c55e" }}>Admin Review & Publishing</div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                    Admin reviews questions. Can either <strong>Approve & Publish</strong> or <strong>Return for Revision</strong>.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Filter Pills */}
-            <div style={{ display: "flex", gap: "8px", marginBottom: "20px", flexWrap: "wrap" }}>
-              {[
-                { id: "all", label: "All Examinations", count: (isTeacher ? exams.filter(e => e.assignedTeacherId === currentUser?.uid || e.assignedTeacherName === currentUser?.name) : exams).length },
-                { id: EXAM_STATUS.PENDING_TEACHER, label: "Awaiting Teacher Authoring", count: (isTeacher ? exams.filter(e => (e.assignedTeacherId === currentUser?.uid || e.assignedTeacherName === currentUser?.name) && e.status === EXAM_STATUS.PENDING_TEACHER) : exams.filter(e => e.status === EXAM_STATUS.PENDING_TEACHER)).length },
-                { id: EXAM_STATUS.PENDING_ADMIN, label: "Pending Admin Approval", count: (isTeacher ? exams.filter(e => (e.assignedTeacherId === currentUser?.uid || e.assignedTeacherName === currentUser?.name) && e.status === EXAM_STATUS.PENDING_ADMIN) : exams.filter(e => e.status === EXAM_STATUS.PENDING_ADMIN)).length },
-                { id: EXAM_STATUS.REVISION, label: "Revision Requested", count: (isTeacher ? exams.filter(e => (e.assignedTeacherId === currentUser?.uid || e.assignedTeacherName === currentUser?.name) && e.status === EXAM_STATUS.REVISION) : exams.filter(e => e.status === EXAM_STATUS.REVISION)).length },
-                { id: EXAM_STATUS.APPROVED, label: "Approved & Published", count: (isTeacher ? exams.filter(e => (e.assignedTeacherId === currentUser?.uid || e.assignedTeacherName === currentUser?.name) && e.status === EXAM_STATUS.APPROVED) : exams.filter(e => e.status === EXAM_STATUS.APPROVED)).length }
-              ].map((f) => (
-                <button
-                  key={f.id}
-                  onClick={() => setExamFilter(f.id)}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: "8px",
-                    border: "1px solid",
-                    borderColor: examFilter === f.id ? "#6366f1" : "rgba(255,255,255,0.08)",
-                    background: examFilter === f.id ? "rgba(99, 102, 241, 0.2)" : "rgba(255,255,255,0.03)",
-                    color: examFilter === f.id ? "#ffffff" : "var(--text-muted)",
-                    fontSize: "0.82rem",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px"
-                  }}
-                >
-                  <span>{f.label}</span>
-                  <span style={{ fontSize: "0.72rem", opacity: 0.7 }}>({f.count})</span>
-                </button>
-              ))}
-            </div>
-
-            {/* Examination Cards Grid */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-              {filteredExams.length === 0 ? (
-                <div className="glass-panel" style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
-                  <FileText size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
-                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>No examinations found</div>
-                  <div style={{ fontSize: "0.85rem", marginTop: "4px" }}>
-                    {isTeacher ? "You have no examinations assigned matching this filter." : "Schedule a new examination to initiate the rotation workflow."}
-                  </div>
-                </div>
-              ) : (
-                filteredExams.map((exam) => {
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {visibleExams.map((exam) => {
                   const statusMeta = EXAM_STATUS_LABELS[exam.status] || { label: exam.status, color: "#94a3b8", bg: "rgba(255,255,255,0.1)" };
-                  const currentAllocatedMarks = (exam.questions || []).reduce((acc, q) => acc + (Number(q.marks) || 0), 0);
-                  const isTeacherAssigned = isTeacher && (exam.assignedTeacherId === currentUser?.uid || exam.assignedTeacherName === currentUser?.name);
+                  const currentMarks = (exam.questions || []).reduce((acc, q) => acc + (Number(q.marks) || 0), 0);
 
                   return (
                     <div
                       key={exam.id}
                       className="glass-panel"
                       style={{
-                        padding: "24px",
-                        borderLeft: `4px solid ${statusMeta.color}`,
-                        transition: "all 0.2s ease"
+                        padding: "22px",
+                        borderLeft: `4px solid ${statusMeta.color}`
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "14px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "12px" }}>
                         <div>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                             <span style={{
                               fontSize: "0.75rem",
                               fontWeight: 800,
-                              padding: "3px 10px",
+                              padding: "2px 8px",
                               borderRadius: "6px",
                               background: statusMeta.bg,
                               color: statusMeta.color,
                               border: `1px solid ${statusMeta.color}40`,
                               display: "inline-flex",
                               alignItems: "center",
-                              gap: "6px"
+                              gap: "4px"
                             }}>
-                              {exam.status === EXAM_STATUS.PENDING_TEACHER && <Clock size={12} />}
-                              {exam.status === EXAM_STATUS.PENDING_ADMIN && <AlertCircle size={12} />}
-                              {exam.status === EXAM_STATUS.REVISION && <RotateCcw size={12} />}
-                              {exam.status === EXAM_STATUS.APPROVED && <CheckCircle2 size={12} />}
-                              <span>{statusMeta.label}</span>
+                              {statusMeta.label}
                             </span>
-
                             <span className="badge badge-indigo">{exam.batchCode}</span>
                             <span style={{ fontSize: "0.78rem", color: "var(--text-dim)" }}>
-                              Target: <strong>{exam.totalMarks} Marks</strong> ({exam.durationMinutes} mins)
+                              Target: {exam.totalMarks} Marks ({exam.durationMinutes} mins)
                             </span>
                           </div>
 
-                          <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#ffffff" }}>
+                          <h3 style={{ fontSize: "1.18rem", fontWeight: 800, color: "#ffffff" }}>
                             {exam.title}
                           </h3>
-                          <div style={{ fontSize: "0.85rem", color: "#38bdf8", marginTop: "2px" }}>
+                          <div style={{ fontSize: "0.82rem", color: "#38bdf8", marginTop: "2px" }}>
                             {exam.courseTitle}
                           </div>
                         </div>
 
-                        {/* Top Right Meta */}
                         <div style={{ textAlign: "right", fontSize: "0.82rem", color: "var(--text-muted)" }}>
                           <div>Assigned Faculty: <strong style={{ color: "#ffffff" }}>{exam.assignedTeacherName}</strong></div>
                           <div>Exam Date: <strong>{exam.examDate}</strong></div>
-                          <div>Questions Drafted: <strong style={{ color: currentAllocatedMarks >= exam.totalMarks ? "#34d399" : "#fbbf24" }}>{exam.questions?.length || 0} ({currentAllocatedMarks}/{exam.totalMarks} pts)</strong></div>
+                          <div>Questions Drafted: <strong>{exam.questions?.length || 0} ({currentMarks}/{exam.totalMarks} pts)</strong></div>
                         </div>
                       </div>
 
-                      {/* ROTATION STATE BANNER: Displays exact permissions & locks */}
+                      {/* ROTATION STATUS NOTICE */}
                       <div style={{
-                        borderRadius: "10px",
-                        padding: "12px 16px",
-                        marginBottom: "16px",
-                        fontSize: "0.85rem",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        background: 
-                          exam.status === EXAM_STATUS.PENDING_TEACHER 
-                            ? "rgba(234, 179, 8, 0.08)"
-                            : exam.status === EXAM_STATUS.PENDING_ADMIN
-                            ? "rgba(56, 189, 248, 0.08)"
-                            : exam.status === EXAM_STATUS.REVISION
-                            ? "rgba(249, 115, 22, 0.08)"
-                            : "rgba(34, 197, 94, 0.08)",
+                        borderRadius: "8px",
+                        padding: "10px 14px",
+                        marginBottom: "14px",
+                        fontSize: "0.84rem",
+                        background: "rgba(0,0,0,0.3)",
                         border: `1px solid ${statusMeta.color}30`
                       }}>
                         {exam.status === EXAM_STATUS.PENDING_TEACHER && (
-                          <>
-                            <Lock size={18} color="#eab308" />
-                            <div style={{ color: "#fef08a", flex: 1 }}>
-                              {isAdmin ? (
-                                <span>
-                                  <strong>Admin Approval Locked:</strong> Question paper formulation is currently assigned to <strong>{exam.assignedTeacherName}</strong>. Admin access to approve or edit questions remains locked until the instructor submits the paper.
-                                </span>
-                              ) : isTeacherAssigned ? (
-                                <span>
-                                  <strong>Teacher Action Required:</strong> You have been assigned to prepare this question paper. Please formulate questions and submit to the Director for approval.
-                                </span>
-                              ) : (
-                                <span>Question paper formulation in progress by teaching faculty.</span>
-                              )}
-                            </div>
-                          </>
+                          <div style={{ color: "#fef08a", display: "flex", alignItems: "center", gap: "8px" }}>
+                            <Lock size={16} />
+                            <span>
+                              {isAdmin 
+                                ? `Awaiting Question Paper from ${exam.assignedTeacherName}. Admin approval access is locked until submission.`
+                                : `You have been assigned to prepare this question paper. Please formulate questions and submit to Director for approval.`}
+                            </span>
+                          </div>
                         )}
 
                         {exam.status === EXAM_STATUS.PENDING_ADMIN && (
-                          <>
-                            <AlertCircle size={18} color="#38bdf8" />
-                            <div style={{ color: "#bae6fd", flex: 1 }}>
-                              {isAdmin ? (
-                                <span>
-                                  <strong>Admin Review Unlocked:</strong> Question paper submitted by <strong>{exam.assignedTeacherName}</strong> on {exam.submittedAt}. Please review the questions, verify syllabus coverage, and approve or request revision.
-                                </span>
-                              ) : isTeacherAssigned ? (
-                                <span>
-                                  <strong>Paper Submitted (Locked):</strong> You submitted this paper on {exam.submittedAt}. Question editing is <strong>DISABLED</strong> while awaiting Director approval.
-                                </span>
-                              ) : (
-                                <span>Paper submitted to Executive Director for official approval.</span>
-                              )}
-                            </div>
-                          </>
+                          <div style={{ color: "#bae6fd", display: "flex", alignItems: "center", gap: "8px" }}>
+                            <CheckCircle2 size={16} />
+                            <span>
+                              {isAdmin 
+                                ? `Paper submitted by ${exam.assignedTeacherName} on ${exam.submittedAt}. Review unlocked for Admin!`
+                                : `Paper submitted on ${exam.submittedAt}. Editing is LOCKED while awaiting Director review.`}
+                            </span>
+                          </div>
                         )}
 
                         {exam.status === EXAM_STATUS.REVISION && (
-                          <>
-                            <RotateCcw size={18} color="#f97316" />
-                            <div style={{ color: "#fdba74", flex: 1 }}>
-                              <div>
-                                <strong>Revision Requested by Admin:</strong> "{exam.adminFeedback}"
-                              </div>
-                              <div style={{ fontSize: "0.78rem", marginTop: "2px", opacity: 0.9 }}>
-                                {isTeacherAssigned ? "Editing has been re-enabled for you. Please adjust the questions according to Director feedback and re-submit." : "Waiting for teacher to submit revised question paper."}
-                              </div>
+                          <div style={{ color: "#fdba74" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <RotateCcw size={16} />
+                              <strong>Director Revision Notes: "{exam.adminFeedback}"</strong>
                             </div>
-                          </>
+                            <div style={{ fontSize: "0.78rem", marginTop: "2px" }}>
+                              {isTeacher ? "Editing has been re-enabled for you. Please adjust questions and re-submit." : "Waiting for teacher to submit revised question paper."}
+                            </div>
+                          </div>
                         )}
 
                         {exam.status === EXAM_STATUS.APPROVED && (
-                          <>
-                            <ShieldCheck size={18} color="#22c55e" />
-                            <div style={{ color: "#bbf7d0", flex: 1 }}>
-                              <strong>Approved & Published:</strong> Officially verified by Director on {exam.approvedAt}. Paper is locked and ready for conduction/printing.
-                            </div>
-                          </>
+                          <div style={{ color: "#bbf7d0", display: "flex", alignItems: "center", gap: "8px" }}>
+                            <ShieldCheck size={16} />
+                            <span>Approved and published by Director on {exam.approvedAt}. Paper finalized.</span>
+                          </div>
                         )}
                       </div>
 
-                      {/* Bottom Action Buttons enforcing strict rotation */}
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "14px", flexWrap: "wrap", gap: "10px" }}>
-                        <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>
-                          Passing: <strong>{exam.passingMarks} Marks</strong> | Instructions: <em>{exam.instructions?.slice(0, 60)}...</em>
-                        </div>
+                      {/* ACTIONS STRICTLY BY ROLE */}
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", alignItems: "center" }}>
+                        {/* ADMIN ONLY ACTIONS */}
+                        {isAdmin && (
+                          <>
+                            {exam.status === EXAM_STATUS.PENDING_TEACHER && (
+                              <button
+                                disabled
+                                style={{
+                                  padding: "8px 14px",
+                                  borderRadius: "8px",
+                                  background: "rgba(255,255,255,0.05)",
+                                  border: "1px solid rgba(255,255,255,0.1)",
+                                  color: "#64748b",
+                                  fontSize: "0.82rem",
+                                  cursor: "not-allowed",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px"
+                                }}
+                              >
+                                <Lock size={14} />
+                                <span>Approval Locked (Awaiting Teacher Submission)</span>
+                              </button>
+                            )}
 
-                        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                          {/* ADMIN ACTIONS */}
-                          {isAdmin && (
-                            <>
-                              {exam.status === EXAM_STATUS.PENDING_TEACHER && (
+                            {exam.status === EXAM_STATUS.PENDING_ADMIN && (
+                              <>
                                 <button
-                                  disabled
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "6px",
-                                    padding: "8px 14px",
-                                    borderRadius: "8px",
-                                    background: "rgba(255, 255, 255, 0.04)",
-                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                    color: "#64748b",
-                                    fontSize: "0.82rem",
-                                    cursor: "not-allowed"
+                                  onClick={() => {
+                                    setRevisionModalExam(exam);
+                                    setRevisionFeedbackText("");
                                   }}
-                                  title="Admin approval is locked until teacher submits the question paper"
-                                >
-                                  <Lock size={14} />
-                                  <span>Approval Locked (Awaiting Teacher)</span>
-                                </button>
-                              )}
-
-                              {exam.status === EXAM_STATUS.PENDING_ADMIN && (
-                                <>
-                                  <button
-                                    onClick={() => {
-                                      setRevisionModalExam(exam);
-                                      setRevisionFeedbackText("");
-                                    }}
-                                    className="btn-secondary"
-                                    style={{ padding: "8px 14px", fontSize: "0.82rem", color: "#f97316", borderColor: "rgba(249,115,22,0.4)" }}
-                                  >
-                                    <RotateCcw size={14} />
-                                    <span>Request Revision</span>
-                                  </button>
-
-                                  <button
-                                    onClick={() => setReviewExam(exam)}
-                                    className="btn-primary"
-                                    style={{ padding: "8px 16px", fontSize: "0.82rem", background: "linear-gradient(135deg, #10b981, #059669)" }}
-                                  >
-                                    <CheckCircle2 size={14} />
-                                    <span>Review & Approve Paper</span>
-                                  </button>
-                                </>
-                              )}
-
-                              {exam.status === EXAM_STATUS.REVISION && (
-                                <button
-                                  disabled
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "6px",
-                                    padding: "8px 14px",
-                                    borderRadius: "8px",
-                                    background: "rgba(255, 255, 255, 0.04)",
-                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                    color: "#64748b",
-                                    fontSize: "0.82rem",
-                                    cursor: "not-allowed"
-                                  }}
+                                  className="btn-secondary"
+                                  style={{ padding: "8px 14px", fontSize: "0.82rem", color: "#f97316" }}
                                 >
                                   <RotateCcw size={14} />
-                                  <span>Waiting for Revised Submission</span>
+                                  <span>Request Revision</span>
                                 </button>
-                              )}
-
-                              {exam.status === EXAM_STATUS.APPROVED && (
                                 <button
-                                  onClick={() => setPrintableExam(exam)}
-                                  className="btn-secondary"
-                                  style={{ padding: "8px 14px", fontSize: "0.82rem", color: "#38bdf8", borderColor: "rgba(56,189,248,0.4)" }}
-                                >
-                                  <Printer size={14} />
-                                  <span>View & Print Official Paper</span>
-                                </button>
-                              )}
-                            </>
-                          )}
-
-                          {/* TEACHER ACTIONS */}
-                          {isTeacher && isTeacherAssigned && (
-                            <>
-                              {(exam.status === EXAM_STATUS.PENDING_TEACHER || exam.status === EXAM_STATUS.REVISION) ? (
-                                <button
-                                  onClick={() => handleOpenAuthoringStudio(exam)}
+                                  onClick={() => setReviewExam(exam)}
                                   className="btn-primary"
-                                  style={{ padding: "8px 16px", fontSize: "0.82rem", background: "linear-gradient(135deg, #3b82f6, #2563eb)" }}
+                                  style={{ padding: "8px 16px", fontSize: "0.82rem", background: "linear-gradient(135deg, #10b981, #059669)" }}
                                 >
-                                  <Edit3 size={14} />
-                                  <span>Author & Submit Paper</span>
+                                  <CheckCircle2 size={14} />
+                                  <span>Review & Approve Paper</span>
                                 </button>
-                              ) : exam.status === EXAM_STATUS.PENDING_ADMIN ? (
-                                <button
-                                  disabled
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "6px",
-                                    padding: "8px 14px",
-                                    borderRadius: "8px",
-                                    background: "rgba(255, 255, 255, 0.04)",
-                                    border: "1px solid rgba(255, 255, 255, 0.1)",
-                                    color: "#64748b",
-                                    fontSize: "0.82rem",
-                                    cursor: "not-allowed"
-                                  }}
-                                  title="Paper submitted to Director. Editing is locked."
-                                >
-                                  <Lock size={14} />
-                                  <span>Editing Disabled (Under Review)</span>
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => setPrintableExam(exam)}
-                                  className="btn-secondary"
-                                  style={{ padding: "8px 14px", fontSize: "0.82rem" }}
-                                >
-                                  <Printer size={14} />
-                                  <span>View Approved Paper</span>
-                                </button>
-                              )}
-                            </>
-                          )}
+                              </>
+                            )}
 
-                          {/* STUDENT ACTIONS */}
-                          {isStudent && (
-                            <button
-                              onClick={() => setPrintableExam(exam)}
-                              className="btn-secondary"
-                              style={{ padding: "8px 14px", fontSize: "0.82rem" }}
-                            >
-                              <Eye size={14} />
-                              <span>View Paper Format / Syllabus</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        )}
+                            {exam.status === EXAM_STATUS.REVISION && (
+                              <button
+                                disabled
+                                style={{
+                                  padding: "8px 14px",
+                                  borderRadius: "8px",
+                                  background: "rgba(255,255,255,0.05)",
+                                  border: "1px solid rgba(255,255,255,0.1)",
+                                  color: "#64748b",
+                                  fontSize: "0.82rem",
+                                  cursor: "not-allowed"
+                                }}
+                              >
+                                <span>Waiting for Revised Submission</span>
+                              </button>
+                            )}
 
-        {/* 5. ATTENDANCE REGISTER TAB (TEACHER & ADMIN) */}
-        {activeTab === "attendance" && (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <div>
-                <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>
-                  {isTeacher ? "Daily Class Attendance Register" : "Campus Attendance Overview"}
-                </h2>
-                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                  Mark present, absent, or late students with one-click timestamp synchronization
-                </p>
-              </div>
+                            {exam.status === EXAM_STATUS.APPROVED && (
+                              <button
+                                onClick={() => setPrintableExam(exam)}
+                                className="btn-secondary"
+                                style={{ padding: "8px 14px", fontSize: "0.82rem", color: "#38bdf8" }}
+                              >
+                                <Printer size={14} />
+                                <span>View & Print Official Paper</span>
+                              </button>
+                            )}
+                          </>
+                        )}
 
-              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Date:</span>
-                <input
-                  type="date"
-                  value={attendanceDate}
-                  onChange={(e) => setAttendanceDate(e.target.value)}
-                  style={{
-                    padding: "8px 12px",
-                    background: "rgba(0,0,0,0.3)",
-                    border: "1px solid var(--border-subtle)",
-                    borderRadius: "8px",
-                    color: "#ffffff"
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="glass-panel" style={{ padding: "24px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <h3 style={{ fontSize: "1.05rem", fontWeight: 700 }}>
-                  Batch: Full-Stack Web Development (FSWD-B14)
-                </h3>
-                <span className="badge badge-indigo">Lab 1 - Evening Slot</span>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {students.map((std) => {
-                  const currentStatus = attendanceRecords[std.id] || "present";
-                  return (
-                    <div
-                      key={std.id}
-                      style={{
-                        padding: "14px 18px",
-                        background: "rgba(0,0,0,0.25)",
-                        border: "1px solid var(--border-subtle)",
-                        borderRadius: "10px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center"
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "0.95rem" }}>{std.name}</div>
-                        <div style={{ fontSize: "0.78rem", color: "var(--text-dim)" }}>
-                          Roll ID: {std.id.toUpperCase()} | Overall Attendance: {std.attendance}%
-                        </div>
-                      </div>
-
-                      {/* Status Toggle Buttons */}
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <button
-                          onClick={() => setAttendanceRecords({ ...attendanceRecords, [std.id]: "present" })}
-                          style={{
-                            padding: "6px 14px",
-                            borderRadius: "8px",
-                            border: "none",
-                            background: currentStatus === "present" ? "#10b981" : "rgba(255,255,255,0.05)",
-                            color: currentStatus === "present" ? "#ffffff" : "var(--text-muted)",
-                            fontWeight: 700,
-                            fontSize: "0.8rem",
-                            cursor: "pointer"
-                          }}
-                        >
-                          Present
-                        </button>
-
-                        <button
-                          onClick={() => setAttendanceRecords({ ...attendanceRecords, [std.id]: "absent" })}
-                          style={{
-                            padding: "6px 14px",
-                            borderRadius: "8px",
-                            border: "none",
-                            background: currentStatus === "absent" ? "#ef4444" : "rgba(255,255,255,0.05)",
-                            color: currentStatus === "absent" ? "#ffffff" : "var(--text-muted)",
-                            fontWeight: 700,
-                            fontSize: "0.8rem",
-                            cursor: "pointer"
-                          }}
-                        >
-                          Absent
-                        </button>
-
-                        <button
-                          onClick={() => setAttendanceRecords({ ...attendanceRecords, [std.id]: "late" })}
-                          style={{
-                            padding: "6px 14px",
-                            borderRadius: "8px",
-                            border: "none",
-                            background: currentStatus === "late" ? "#f59e0b" : "rgba(255,255,255,0.05)",
-                            color: currentStatus === "late" ? "#ffffff" : "var(--text-muted)",
-                            fontWeight: 700,
-                            fontSize: "0.8rem",
-                            cursor: "pointer"
-                          }}
-                        >
-                          Late
-                        </button>
+                        {/* TEACHER ONLY ACTIONS */}
+                        {isTeacher && (
+                          <>
+                            {(exam.status === EXAM_STATUS.PENDING_TEACHER || exam.status === EXAM_STATUS.REVISION) ? (
+                              <button
+                                onClick={() => handleOpenAuthoringStudio(exam)}
+                                className="btn-primary"
+                                style={{ padding: "8px 16px", fontSize: "0.82rem", background: "linear-gradient(135deg, #3b82f6, #2563eb)" }}
+                              >
+                                <Edit3 size={14} />
+                                <span>Author & Submit Paper</span>
+                              </button>
+                            ) : exam.status === EXAM_STATUS.PENDING_ADMIN ? (
+                              <button
+                                disabled
+                                style={{
+                                  padding: "8px 14px",
+                                  borderRadius: "8px",
+                                  background: "rgba(255,255,255,0.05)",
+                                  border: "1px solid rgba(255,255,255,0.1)",
+                                  color: "#64748b",
+                                  fontSize: "0.82rem",
+                                  cursor: "not-allowed",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "6px"
+                                }}
+                              >
+                                <Lock size={14} />
+                                <span>Editing Locked (Under Review)</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setPrintableExam(exam)}
+                                className="btn-secondary"
+                                style={{ padding: "8px 14px", fontSize: "0.82rem" }}
+                              >
+                                <Printer size={14} />
+                                <span>View Approved Paper</span>
+                              </button>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
                   );
                 })}
               </div>
-
-              <div style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end" }}>
-                <button
-                  onClick={() => alert("Attendance register saved and locked for this date.")}
-                  className="btn-primary"
-                  style={{ padding: "10px 20px" }}
-                >
-                  <CheckSquare size={16} />
-                  <span>Save & Sync Attendance</span>
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
-        {/* 6. DIGITAL CERTIFICATE GENERATOR TAB (ADMIN ONLY) */}
+        {/* ======================================================== */}
+        {/* 6. DIGITAL CERTIFICATES (ADMIN ONLY)                      */}
+        {/* ======================================================== */}
         {activeTab === "certificates" && isAdmin && (
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div>
-                <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>Digital Certificate Issuance & Verification</h2>
+                <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>Digital Certificate Generator</h2>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                  Issue cryptographically signed completion certificates with verifiable serial IDs
+                  Issue verified digital credentials with authenticated serial numbers
                 </p>
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "28px" }}>
-              {/* Form */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
               <div className="glass-panel" style={{ padding: "24px" }}>
                 <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "16px" }}>Issue Certificate</h3>
                 <form onSubmit={handleIssueCertificate}>
@@ -1527,7 +1299,7 @@ export default function App() {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Ali Hassan"
+                      placeholder="e.g. Student Full Name"
                       value={certForm.studentName}
                       onChange={(e) => setCertForm({ ...certForm, studentName: e.target.value })}
                       style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
@@ -1549,7 +1321,7 @@ export default function App() {
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Grade / Division</label>
+                      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Grade</label>
                       <input
                         type="text"
                         value={certForm.grade}
@@ -1558,7 +1330,7 @@ export default function App() {
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Trainer / Instructor</label>
+                      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Instructor</label>
                       <input
                         type="text"
                         value={certForm.instructorName}
@@ -1585,53 +1357,41 @@ export default function App() {
                 </form>
               </div>
 
-              {/* Preview */}
+              {/* Certificate Preview */}
               <div>
-                <div className="glass-panel" style={{ padding: "28px", border: "2px solid #eab308", background: "#0a0e1a", position: "relative", minHeight: "360px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div className="glass-panel" style={{ padding: "28px", border: "2px solid #eab308", background: "#0a0e1a", minHeight: "340px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "0.8rem", color: "#eab308", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 800 }}>
+                    <div style={{ fontSize: "0.78rem", color: "#eab308", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 800 }}>
                       Certificate of Achievement
                     </div>
-                    <div style={{ fontSize: "1.4rem", fontWeight: 900, marginTop: "6px" }}>
+                    <div style={{ fontSize: "1.3rem", fontWeight: 900, marginTop: "4px" }}>
                       APEX EDUCATION FORUM
                     </div>
-                    <div style={{ fontSize: "0.78rem", color: "var(--text-dim)" }}>
-                      Registered Higher Vocational & Technical Institute
-                    </div>
                   </div>
 
-                  <div style={{ textAlign: "center", margin: "24px 0" }}>
-                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>This is proudly presented to</div>
-                    <div style={{ fontSize: "1.6rem", fontWeight: 800, color: "#ffffff", margin: "6px 0", borderBottom: "1px solid rgba(255,255,255,0.1)", display: "inline-block", paddingBottom: "4px" }}>
+                  <div style={{ textAlign: "center", margin: "20px 0" }}>
+                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>This is awarded to</div>
+                    <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#ffffff", margin: "4px 0" }}>
                       {certForm.studentName || "Candidate Name"}
                     </div>
-                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "8px" }}>
-                      for successfully completing the advanced diploma in
+                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                      for completing the course
                     </div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#38bdf8", marginTop: "4px" }}>
+                    <div style={{ fontSize: "1rem", fontWeight: 700, color: "#38bdf8", marginTop: "2px" }}>
                       {certForm.courseTitle}
-                    </div>
-                    <div style={{ fontSize: "0.82rem", color: "#34d399", marginTop: "4px", fontWeight: 600 }}>
-                      Awarded: {certForm.grade}
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "14px", fontSize: "0.75rem", color: "var(--text-dim)" }}>
-                    <div>
-                      <div>Instructor: {certForm.instructorName}</div>
-                      <div>Apex Faculty Board</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ color: "#eab308", fontWeight: 700 }}>
-                        {issuedCert ? issuedCert.certificateId : "APEX-CERT-PREVIEW"}
-                      </div>
-                      <div>Verified Authentic</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "12px", fontSize: "0.75rem", color: "var(--text-dim)" }}>
+                    <div>Apex Faculty Board</div>
+                    <div style={{ color: "#eab308", fontWeight: 700 }}>
+                      {issuedCert ? issuedCert.certificateId : "APEX-CERT-PREVIEW"}
                     </div>
                   </div>
                 </div>
 
                 {issuedCert && (
-                  <div style={{ marginTop: "16px", display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                  <div style={{ marginTop: "14px", display: "flex", justifyContent: "flex-end" }}>
                     <button onClick={() => window.print()} className="btn-secondary" style={{ fontSize: "0.85rem" }}>
                       <Printer size={15} />
                       <span>Print Certificate</span>
@@ -1645,9 +1405,91 @@ export default function App() {
 
       </div>
 
-      {/* --- MODALS --- */}
+      {/* ======================================================== */}
+      {/* MODALS                                                   */}
+      {/* ======================================================== */}
 
-      {/* 1. Modal: Admin Schedules Exam */}
+      {/* 1. Modal: Register New Teacher */}
+      {showTeacherModal && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+          zIndex: 9999
+        }}>
+          <div className="glass-panel" style={{ maxWidth: "460px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 style={{ fontSize: "1.2rem", fontWeight: 800 }}>Register Faculty Member</h3>
+              <button onClick={() => setShowTeacherModal(false)} style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateTeacher}>
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Teacher Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Engr. Bilal Ahmed"
+                  value={newTeacherForm.name}
+                  onChange={(e) => setNewTeacherForm({ ...newTeacherForm, name: e.target.value })}
+                  style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Official Email *</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="name@apex.edu"
+                  value={newTeacherForm.email}
+                  onChange={(e) => setNewTeacherForm({ ...newTeacherForm, email: e.target.value })}
+                  style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                />
+              </div>
+
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Department</label>
+                <select
+                  value={newTeacherForm.department}
+                  onChange={(e) => setNewTeacherForm({ ...newTeacherForm, department: e.target.value })}
+                  style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                >
+                  <option value="IT & Web Development">IT & Web Development</option>
+                  <option value="AI & Data Science">AI & Data Science</option>
+                  <option value="English Language & IELTS">English Language & IELTS</option>
+                  <option value="Creative Media & Graphic Design">Creative Media & Graphic Design</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: "20px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Phone</label>
+                <input
+                  type="text"
+                  placeholder="+92 300 1234567"
+                  value={newTeacherForm.phone}
+                  onChange={(e) => setNewTeacherForm({ ...newTeacherForm, phone: e.target.value })}
+                  style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+                <button type="button" onClick={() => setShowTeacherModal(false)} className="btn-secondary">Cancel</button>
+                <button type="submit" className="btn-primary">Register Teacher</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Modal: Schedule Exam */}
       {showScheduleExamModal && (
         <div style={{
           position: "fixed",
@@ -1669,7 +1511,7 @@ export default function App() {
             </div>
 
             <div style={{ padding: "10px 14px", background: "rgba(234, 179, 8, 0.1)", border: "1px solid rgba(234, 179, 8, 0.3)", borderRadius: "8px", marginBottom: "16px", fontSize: "0.82rem", color: "#fef08a" }}>
-              <strong>Lifecycle Notice:</strong> Scheduling this exam assigns it to the selected faculty member. Admin approval access is locked until the teacher prepares and submits the question paper.
+              <strong>Lifecycle Rule:</strong> Scheduling this exam delegates question formulation to the assigned teacher. Admin approval access is locked until the teacher submits the paper.
             </div>
 
             <form onSubmit={handleScheduleExamSubmit}>
@@ -1687,7 +1529,7 @@ export default function App() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Course Program</label>
+                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Course</label>
                   <select
                     value={newExamForm.courseId}
                     onChange={(e) => setNewExamForm({ ...newExamForm, courseId: e.target.value })}
@@ -1700,30 +1542,48 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Target Batch Code</label>
-                  <select
+                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Batch Code</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. FSWD-B1"
                     value={newExamForm.batchCode}
                     onChange={(e) => setNewExamForm({ ...newExamForm, batchCode: e.target.value })}
-                    style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
-                  >
-                    {batches.map(b => (
-                      <option key={b.id} value={b.batchCode}>{b.batchCode} - {b.courseTitle}</option>
-                    ))}
-                  </select>
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
                 </div>
               </div>
 
               <div style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Assign Question Authoring to Faculty *</label>
-                <select
-                  value={newExamForm.assignedTeacherId}
-                  onChange={(e) => setNewExamForm({ ...newExamForm, assignedTeacherId: e.target.value })}
-                  style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
-                >
-                  {DEMO_USERS.filter(u => u.role === ROLES.INSTRUCTOR).map(inst => (
-                    <option key={inst.uid} value={inst.uid}>{inst.name} ({inst.title})</option>
-                  ))}
-                </select>
+                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Assign Question Authoring to Teacher *</label>
+                {teachers.length > 0 ? (
+                  <select
+                    value={newExamForm.assignedTeacherName}
+                    onChange={(e) => {
+                      const t = teachers.find(tch => tch.name === e.target.value);
+                      setNewExamForm({
+                        ...newExamForm,
+                        assignedTeacherName: e.target.value,
+                        assignedTeacherId: t ? t.id : "",
+                        assignedTeacherEmail: t ? t.email : ""
+                      });
+                    }}
+                    style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  >
+                    <option value="">-- Select Registered Teacher --</option>
+                    {teachers.map(t => (
+                      <option key={t.id} value={t.name}>{t.name} ({t.department})</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Engr. Bilal Ahmed (or register teacher from Faculty tab)"
+                    value={newExamForm.assignedTeacherName}
+                    onChange={(e) => setNewExamForm({ ...newExamForm, assignedTeacherName: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                )}
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "14px" }}>
@@ -1757,7 +1617,7 @@ export default function App() {
               </div>
 
               <div style={{ marginBottom: "18px" }}>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Candidate Instructions</label>
+                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Instructions</label>
                 <textarea
                   rows={2}
                   value={newExamForm.instructions}
@@ -1775,7 +1635,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 2. Modal: Teacher Question Authoring Studio */}
+      {/* 3. Modal: Teacher Question Studio */}
       {authoringExam && (
         <div style={{
           position: "fixed",
@@ -1788,115 +1648,97 @@ export default function App() {
           padding: "20px",
           zIndex: 9999
         }}>
-          <div className="glass-panel" style={{ maxWidth: "880px", width: "100%", maxHeight: "90vh", overflowY: "auto", padding: "28px", borderRadius: "var(--radius-lg)" }}>
+          <div className="glass-panel" style={{ maxWidth: "860px", width: "100%", maxHeight: "90vh", overflowY: "auto", padding: "28px", borderRadius: "var(--radius-lg)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "18px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "14px" }}>
               <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span className="badge badge-emerald">Teacher Question Studio</span>
-                  <span className="badge badge-indigo">{authoringExam.batchCode}</span>
-                </div>
-                <h3 style={{ fontSize: "1.3rem", fontWeight: 800, color: "#ffffff", marginTop: "4px" }}>
+                <span className="badge badge-emerald">Teacher Question Studio</span>
+                <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#ffffff", marginTop: "4px" }}>
                   {authoringExam.title}
                 </h3>
               </div>
 
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Target Marks: <strong>{authoringExam.totalMarks} pts</strong></div>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>Target: <strong>{authoringExam.totalMarks} pts</strong></div>
                 <div style={{ fontSize: "0.95rem", fontWeight: 800, color: authoringQuestions.reduce((a,q) => a + Number(q.marks), 0) >= authoringExam.totalMarks ? "#34d399" : "#fbbf24" }}>
                   Allocated: {authoringQuestions.reduce((a,q) => a + Number(q.marks), 0)} / {authoringExam.totalMarks} pts
                 </div>
               </div>
             </div>
 
-            {/* Authoring Form */}
-            <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "18px", marginBottom: "20px" }}>
-              <h4 style={{ fontSize: "0.95rem", fontWeight: 700, marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <Plus size={16} color="#38bdf8" />
-                <span>Add New Question to Paper</span>
-              </h4>
+            {/* Question Form */}
+            <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px", padding: "16px", marginBottom: "20px" }}>
+              <h4 style={{ fontSize: "0.92rem", fontWeight: 700, marginBottom: "10px" }}>Add Question</h4>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: "12px", marginBottom: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "4px" }}>Question Type</label>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    {[
-                      { id: "mcq", label: "Multiple Choice (MCQ)" },
-                      { id: "short", label: "Short / Descriptive" },
-                      { id: "code", label: "Coding / Practical" }
-                    ].map(t => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => setNewQuestionType(t.id)}
-                        style={{
-                          padding: "6px 12px",
-                          borderRadius: "6px",
-                          border: "1px solid",
-                          borderColor: newQuestionType === t.id ? "#38bdf8" : "rgba(255,255,255,0.1)",
-                          background: newQuestionType === t.id ? "rgba(56, 189, 248, 0.2)" : "rgba(0,0,0,0.2)",
-                          color: newQuestionType === t.id ? "#ffffff" : "var(--text-muted)",
-                          fontSize: "0.78rem",
-                          fontWeight: 600,
-                          cursor: "pointer"
-                        }}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
-                  </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: "12px", marginBottom: "10px" }}>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  {[
+                    { id: "mcq", label: "Multiple Choice" },
+                    { id: "short", label: "Short Answer" },
+                    { id: "code", label: "Coding Task" }
+                  ].map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setNewQuestionType(t.id)}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: "6px",
+                        border: "1px solid",
+                        borderColor: newQuestionType === t.id ? "#38bdf8" : "rgba(255,255,255,0.1)",
+                        background: newQuestionType === t.id ? "rgba(56, 189, 248, 0.2)" : "rgba(0,0,0,0.2)",
+                        color: newQuestionType === t.id ? "#ffffff" : "var(--text-muted)",
+                        fontSize: "0.78rem",
+                        fontWeight: 600,
+                        cursor: "pointer"
+                      }}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "4px" }}>Marks</label>
                   <input
                     type="number"
                     value={newQuestionMarks}
                     onChange={(e) => setNewQuestionMarks(e.target.value)}
+                    placeholder="Marks"
                     style={{ width: "100%", padding: "8px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "6px", color: "#ffffff" }}
                   />
                 </div>
               </div>
 
-              <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "4px" }}>Question Text / Problem Statement</label>
-                <textarea
-                  rows={2}
-                  placeholder="Enter the question statement clearly..."
-                  value={newQuestionText}
-                  onChange={(e) => setNewQuestionText(e.target.value)}
-                  style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "6px", color: "#ffffff" }}
-                />
-              </div>
+              <textarea
+                rows={2}
+                placeholder="Enter question statement..."
+                value={newQuestionText}
+                onChange={(e) => setNewQuestionText(e.target.value)}
+                style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "6px", color: "#ffffff", marginBottom: "10px" }}
+              />
 
-              {/* MCQ Options input */}
               {newQuestionType === "mcq" && (
-                <div style={{ marginBottom: "14px" }}>
-                  <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 600, marginBottom: "6px" }}>
-                    Options (Select the correct answer choice):
-                  </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                    {newMcqOptions.map((opt, idx) => (
-                      <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <input
-                          type="radio"
-                          name="correctOptionRadio"
-                          checked={newCorrectOption === idx}
-                          onChange={() => setNewCorrectOption(idx)}
-                        />
-                        <input
-                          type="text"
-                          placeholder={`Option ${String.fromCharCode(65 + idx)}`}
-                          value={opt}
-                          onChange={(e) => {
-                            const copy = [...newMcqOptions];
-                            copy[idx] = e.target.value;
-                            setNewMcqOptions(copy);
-                          }}
-                          style={{ flex: 1, padding: "8px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "6px", color: "#ffffff", fontSize: "0.85rem" }}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
+                  {newMcqOptions.map((opt, idx) => (
+                    <div key={idx} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <input
+                        type="radio"
+                        name="mcqRadio"
+                        checked={newCorrectOption === idx}
+                        onChange={() => setNewCorrectOption(idx)}
+                      />
+                      <input
+                        type="text"
+                        placeholder={`Option ${String.fromCharCode(65 + idx)}`}
+                        value={opt}
+                        onChange={(e) => {
+                          const copy = [...newMcqOptions];
+                          copy[idx] = e.target.value;
+                          setNewMcqOptions(copy);
+                        }}
+                        style={{ flex: 1, padding: "8px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "6px", color: "#ffffff", fontSize: "0.85rem" }}
+                      />
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -1904,72 +1746,36 @@ export default function App() {
                 type="button"
                 onClick={handleAddQuestion}
                 className="btn-secondary"
-                style={{ padding: "8px 16px", fontSize: "0.82rem", background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", borderColor: "#38bdf8" }}
+                style={{ padding: "8px 14px", fontSize: "0.8rem", color: "#38bdf8", borderColor: "#38bdf8" }}
               >
-                <Plus size={14} />
-                <span>Add Question to List</span>
+                + Add to Question List
               </button>
             </div>
 
             {/* Questions List */}
             <div style={{ marginBottom: "20px" }}>
-              <h4 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "12px" }}>
-                Current Questions in Paper ({authoringQuestions.length})
+              <h4 style={{ fontSize: "0.95rem", fontWeight: 700, marginBottom: "10px" }}>
+                Current Questions ({authoringQuestions.length})
               </h4>
 
               {authoringQuestions.length === 0 ? (
-                <div style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)", background: "rgba(0,0,0,0.2)", borderRadius: "8px" }}>
-                  No questions added yet. Formulate questions using the form above.
+                <div style={{ padding: "20px", textAlign: "center", color: "var(--text-muted)" }}>
+                  No questions added yet. Formulate questions using the builder above.
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {authoringQuestions.map((q, idx) => (
-                    <div
-                      key={q.id}
-                      style={{
-                        padding: "14px",
-                        background: "rgba(0,0,0,0.25)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                        borderRadius: "8px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "flex-start",
-                        gap: "12px"
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                    <div key={q.id} style={{ padding: "12px", background: "rgba(0,0,0,0.25)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
                           <span style={{ fontWeight: 800, color: "#38bdf8" }}>Q{idx + 1}.</span>
                           <span className="badge badge-indigo" style={{ fontSize: "0.7rem" }}>{q.type.toUpperCase()}</span>
                           <span style={{ fontSize: "0.75rem", color: "#34d399", fontWeight: 700 }}>[{q.marks} Marks]</span>
                         </div>
                         <div style={{ fontSize: "0.9rem", color: "#ffffff" }}>{q.questionText}</div>
-
-                        {q.type === "mcq" && q.options && (
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginTop: "8px", fontSize: "0.8rem" }}>
-                            {q.options.map((opt, oIdx) => (
-                              <div
-                                key={oIdx}
-                                style={{
-                                  padding: "4px 8px",
-                                  borderRadius: "4px",
-                                  background: q.correctOption === oIdx ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.03)",
-                                  color: q.correctOption === oIdx ? "#34d399" : "var(--text-muted)",
-                                  fontWeight: q.correctOption === oIdx ? 700 : 400
-                                }}
-                              >
-                                {String.fromCharCode(65 + oIdx)}. {opt} {q.correctOption === oIdx ? "✓ (Correct)" : ""}
-                              </div>
-                            ))}
-                          </div>
-                        )}
                       </div>
 
-                      <button
-                        onClick={() => handleDeleteQuestion(q.id)}
-                        style={{ background: "transparent", border: "none", color: "#f87171", cursor: "pointer", padding: "4px" }}
-                        title="Delete Question"
-                      >
+                      <button onClick={() => handleDeleteQuestion(q.id)} style={{ background: "transparent", border: "none", color: "#f87171", cursor: "pointer" }}>
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -1978,16 +1784,10 @@ export default function App() {
               )}
             </div>
 
-            {/* Footer Submission Action */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "16px" }}>
-              <button
-                type="button"
-                onClick={() => setAuthoringExam(null)}
-                className="btn-secondary"
-              >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "14px" }}>
+              <button type="button" onClick={() => setAuthoringExam(null)} className="btn-secondary">
                 Save Draft & Close
               </button>
-
               <button
                 type="button"
                 onClick={handleSubmitPaperToAdmin}
@@ -2002,7 +1802,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 3. Modal: Admin Question Paper Review & Approval */}
+      {/* 4. Modal: Admin Review */}
       {reviewExam && (
         <div style={{
           position: "fixed",
@@ -2018,108 +1818,73 @@ export default function App() {
           <div className="glass-panel" style={{ maxWidth: "860px", width: "100%", maxHeight: "90vh", overflowY: "auto", padding: "28px", borderRadius: "var(--radius-lg)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "14px" }}>
               <div>
-                <span className="badge badge-cyan">Executive Director Review</span>
-                <h3 style={{ fontSize: "1.3rem", fontWeight: 800, color: "#ffffff", marginTop: "4px" }}>
+                <span className="badge badge-cyan">Executive Review</span>
+                <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#ffffff", marginTop: "4px" }}>
                   {reviewExam.title}
                 </h3>
-                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
                   Submitted by: <strong>{reviewExam.assignedTeacherName}</strong> on {reviewExam.submittedAt}
                 </div>
               </div>
 
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>Total Target: {reviewExam.totalMarks} Marks</div>
+                <div style={{ fontSize: "0.8rem", color: "var(--text-dim)" }}>Total Target: {reviewExam.totalMarks} pts</div>
                 <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#34d399" }}>
-                  Allocated: {(reviewExam.questions || []).reduce((a,q) => a + Number(q.marks), 0)} Marks
+                  Allocated: {(reviewExam.questions || []).reduce((a,q) => a + Number(q.marks), 0)} pts
                 </div>
               </div>
             </div>
 
-            {/* Questions to review */}
-            <div style={{ marginBottom: "20px" }}>
-              <h4 style={{ fontSize: "0.95rem", fontWeight: 700, marginBottom: "12px" }}>
-                Submitted Questions ({reviewExam.questions?.length || 0})
-              </h4>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {(reviewExam.questions || []).map((q, idx) => (
-                  <div key={q.id} style={{ padding: "14px", background: "rgba(0,0,0,0.3)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.06)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                      <span style={{ fontWeight: 800, color: "#38bdf8" }}>Q{idx + 1}.</span>
-                      <span className="badge badge-indigo" style={{ fontSize: "0.7rem" }}>{q.type.toUpperCase()}</span>
-                      <span style={{ fontSize: "0.75rem", color: "#34d399", fontWeight: 700 }}>[{q.marks} Marks]</span>
-                    </div>
-                    <div style={{ fontSize: "0.92rem", color: "#ffffff" }}>{q.questionText}</div>
-
-                    {q.type === "mcq" && q.options && (
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginTop: "8px", fontSize: "0.8rem" }}>
-                        {q.options.map((opt, oIdx) => (
-                          <div
-                            key={oIdx}
-                            style={{
-                              padding: "4px 8px",
-                              borderRadius: "4px",
-                              background: q.correctOption === oIdx ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.03)",
-                              color: q.correctOption === oIdx ? "#34d399" : "var(--text-muted)",
-                              fontWeight: q.correctOption === oIdx ? 700 : 400
-                            }}
-                          >
-                            {String.fromCharCode(65 + oIdx)}. {opt} {q.correctOption === oIdx ? "✓ (Marked Answer)" : ""}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" }}>
+              {(reviewExam.questions || []).map((q, idx) => (
+                <div key={q.id} style={{ padding: "12px", background: "rgba(0,0,0,0.3)", borderRadius: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
+                    <span style={{ fontWeight: 800, color: "#38bdf8" }}>Q{idx + 1}.</span>
+                    <span className="badge badge-indigo" style={{ fontSize: "0.7rem" }}>{q.type.toUpperCase()}</span>
+                    <span style={{ fontSize: "0.75rem", color: "#34d399", fontWeight: 700 }}>[{q.marks} Marks]</span>
                   </div>
-                ))}
-              </div>
+                  <div style={{ fontSize: "0.9rem", color: "#ffffff" }}>{q.questionText}</div>
+                </div>
+              ))}
             </div>
 
-            {/* Verification Sign-Off Note */}
-            <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>
-                Director Approval Remarks / Watermark Endorsement (Optional)
+            <div style={{ marginBottom: "18px" }}>
+              <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>
+                Approval Remarks / Feedback Note (Optional)
               </label>
               <input
                 type="text"
-                placeholder="e.g. Verified by Executive Director. High quality questions matching curriculum standards."
+                placeholder="e.g. Approved and verified for official conduction."
                 value={adminApprovalNote}
                 onChange={(e) => setAdminApprovalNote(e.target.value)}
                 style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
               />
             </div>
 
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "16px" }}>
-              <button
-                type="button"
-                onClick={() => setReviewExam(null)}
-                className="btn-secondary"
-              >
-                Close
-              </button>
-
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "14px" }}>
+              <button type="button" onClick={() => setReviewExam(null)} className="btn-secondary">Close</button>
               <div style={{ display: "flex", gap: "10px" }}>
                 <button
                   type="button"
                   onClick={() => {
-                    const examToRevise = reviewExam;
+                    const ex = reviewExam;
                     setReviewExam(null);
-                    setRevisionModalExam(examToRevise);
+                    setRevisionModalExam(ex);
                   }}
                   className="btn-secondary"
-                  style={{ color: "#f97316", borderColor: "rgba(249,115,22,0.4)" }}
+                  style={{ color: "#f97316" }}
                 >
-                  <RotateCcw size={15} />
+                  <RotateCcw size={14} />
                   <span>Request Revisions</span>
                 </button>
-
                 <button
                   type="button"
                   onClick={handleAdminApproveExam}
                   className="btn-primary"
-                  style={{ background: "linear-gradient(135deg, #10b981, #059669)", display: "flex", alignItems: "center", gap: "8px" }}
+                  style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}
                 >
                   <CheckCircle2 size={16} />
-                  <span>Approve & Officially Publish Exam</span>
+                  <span>Approve & Publish Exam</span>
                 </button>
               </div>
             </div>
@@ -2127,7 +1892,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 4. Modal: Admin Request Revision Notes */}
+      {/* 5. Modal: Admin Request Revision */}
       {revisionModalExam && (
         <div style={{
           position: "fixed",
@@ -2140,38 +1905,22 @@ export default function App() {
           padding: "20px",
           zIndex: 9999
         }}>
-          <div className="glass-panel" style={{ maxWidth: "520px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
-            <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#f97316", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <RotateCcw size={18} />
-              <span>Return Paper for Teacher Revision</span>
+          <div className="glass-panel" style={{ maxWidth: "500px", width: "100%", padding: "24px", borderRadius: "var(--radius-lg)" }}>
+            <h3 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#f97316", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <RotateCcw size={16} />
+              <span>Return Paper for Revision</span>
             </h3>
-
-            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "16px" }}>
-              Returning this paper will unlock question editing for <strong>{revisionModalExam.assignedTeacherName}</strong> with your feedback notes.
-            </p>
-
-            <div style={{ marginBottom: "18px" }}>
-              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>
-                Director Revision Feedback *
-              </label>
-              <textarea
-                rows={4}
-                required
-                placeholder="e.g. Please add 1 more practical coding question for async/await and ensure total marks equal 50."
-                value={revisionFeedbackText}
-                onChange={(e) => setRevisionFeedbackText(e.target.value)}
-                style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
-              />
-            </div>
-
+            <textarea
+              rows={4}
+              required
+              placeholder="Enter revision instructions for the instructor..."
+              value={revisionFeedbackText}
+              onChange={(e) => setRevisionFeedbackText(e.target.value)}
+              style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff", marginBottom: "16px" }}
+            />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
               <button type="button" onClick={() => setRevisionModalExam(null)} className="btn-secondary">Cancel</button>
-              <button
-                type="button"
-                onClick={handleAdminSubmitRevision}
-                className="btn-primary"
-                style={{ background: "#f97316", border: "none" }}
-              >
+              <button type="button" onClick={handleAdminSubmitRevision} className="btn-primary" style={{ background: "#f97316", border: "none" }}>
                 Send Revision to Teacher
               </button>
             </div>
@@ -2179,7 +1928,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 5. Modal: Official Formatted Question Paper (Printable) */}
+      {/* 6. Modal: View Official Printable Paper */}
       {printableExam && (
         <div style={{
           position: "fixed",
@@ -2193,134 +1942,66 @@ export default function App() {
           zIndex: 9999
         }}>
           <div className="glass-panel" style={{ maxWidth: "800px", width: "100%", maxHeight: "92vh", overflowY: "auto", padding: "36px", borderRadius: "var(--radius-lg)", background: "#ffffff", color: "#0f172a" }}>
-            {/* Action Bar */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", borderBottom: "2px solid #e2e8f0", paddingBottom: "14px" }}>
-              <span style={{ fontSize: "0.82rem", color: "#64748b", fontWeight: 700 }}>
-                APEX EXAMINATION BOARD - CONFIDENTIAL QUESTION PAPER
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: "2px solid #e2e8f0", paddingBottom: "12px" }}>
+              <span style={{ fontSize: "0.8rem", color: "#64748b", fontWeight: 700 }}>
+                APEX EXAMINATION BOARD - OFFICIAL QUESTION PAPER
               </span>
-
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button
-                  onClick={() => window.print()}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    padding: "8px 16px",
-                    borderRadius: "8px",
-                    background: "#4f46e5",
-                    color: "#fff",
-                    border: "none",
-                    fontWeight: 700,
-                    cursor: "pointer"
-                  }}
-                >
-                  <Printer size={16} />
-                  <span>Print Paper</span>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={() => window.print()} style={{ padding: "8px 14px", borderRadius: "6px", background: "#4f46e5", color: "#fff", border: "none", fontWeight: 700, cursor: "pointer" }}>
+                  <Printer size={15} />
+                  <span>Print</span>
                 </button>
-
-                <button
-                  onClick={() => setPrintableExam(null)}
-                  style={{
-                    padding: "8px 14px",
-                    borderRadius: "8px",
-                    background: "#f1f5f9",
-                    color: "#475569",
-                    border: "1px solid #cbd5e1",
-                    fontWeight: 600,
-                    cursor: "pointer"
-                  }}
-                >
+                <button onClick={() => setPrintableExam(null)} style={{ padding: "8px 14px", borderRadius: "6px", background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1", fontWeight: 600, cursor: "pointer" }}>
                   Close
                 </button>
               </div>
             </div>
 
-            {/* Official Header */}
-            <div style={{ textAlign: "center", borderBottom: "2px double #0f172a", paddingBottom: "16px", marginBottom: "20px" }}>
-              <div style={{ fontSize: "1.4rem", fontWeight: 900, letterSpacing: "-0.01em", textTransform: "uppercase" }}>
-                Apex Education Forum
-              </div>
-              <div style={{ fontSize: "0.85rem", color: "#475569", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Center for Advanced Vocational IT & Language Studies
-              </div>
-              <div style={{ fontSize: "1.15rem", fontWeight: 800, marginTop: "8px", color: "#1e293b" }}>
-                {printableExam.title}
-              </div>
+            <div style={{ textAlign: "center", borderBottom: "2px double #0f172a", paddingBottom: "14px", marginBottom: "16px" }}>
+              <div style={{ fontSize: "1.3rem", fontWeight: 900, textTransform: "uppercase" }}>APEX EDUCATION FORUM</div>
+              <div style={{ fontSize: "0.82rem", color: "#475569", fontWeight: 600 }}>Higher Vocational & Technical Institute</div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 800, marginTop: "6px" }}>{printableExam.title}</div>
             </div>
 
-            {/* Exam Metadata Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "0.88rem", marginBottom: "18px", borderBottom: "1px solid #e2e8f0", paddingBottom: "14px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "0.85rem", marginBottom: "16px", borderBottom: "1px solid #e2e8f0", paddingBottom: "12px" }}>
               <div><strong>Course:</strong> {printableExam.courseTitle}</div>
               <div style={{ textAlign: "right" }}><strong>Batch:</strong> {printableExam.batchCode}</div>
-              <div><strong>Date of Exam:</strong> {printableExam.examDate}</div>
-              <div style={{ textAlign: "right" }}><strong>Duration:</strong> {printableExam.durationMinutes} Minutes</div>
-              <div><strong>Faculty Examiner:</strong> {printableExam.assignedTeacherName}</div>
-              <div style={{ textAlign: "right" }}><strong>Max Marks:</strong> {printableExam.totalMarks} (Passing: {printableExam.passingMarks})</div>
+              <div><strong>Date:</strong> {printableExam.examDate}</div>
+              <div style={{ textAlign: "right" }}><strong>Duration:</strong> {printableExam.durationMinutes} Mins</div>
+              <div><strong>Examiner:</strong> {printableExam.assignedTeacherName}</div>
+              <div style={{ textAlign: "right" }}><strong>Total Marks:</strong> {printableExam.totalMarks} (Passing: {printableExam.passingMarks})</div>
             </div>
 
-            {/* Candidate Instructions */}
-            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "12px", marginBottom: "24px", fontSize: "0.82rem", color: "#334155" }}>
-              <strong>GENERAL INSTRUCTIONS TO CANDIDATES:</strong>
-              <div style={{ marginTop: "4px" }}>
-                1. {printableExam.instructions || "All questions are compulsory."}
-              </div>
-              <div>
-                2. Write your Roll Number and Batch Code clearly on the title page of your answer booklet.
-              </div>
-              <div>
-                3. Programmable electronic devices and unauthorized communication items are strictly forbidden.
-              </div>
-            </div>
-
-            {/* Questions Formatted */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               {(printableExam.questions || []).map((q, idx) => (
-                <div key={q.id} style={{ borderBottom: "1px dotted #cbd5e1", paddingBottom: "14px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "6px" }}>
-                    <span style={{ fontWeight: 800, fontSize: "0.95rem" }}>
-                      Q{idx + 1}. {q.questionText}
-                    </span>
-                    <span style={{ fontWeight: 800, fontSize: "0.85rem", color: "#475569" }}>
-                      [{q.marks} Marks]
-                    </span>
+                <div key={q.id} style={{ borderBottom: "1px dotted #cbd5e1", paddingBottom: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "0.92rem", marginBottom: "4px" }}>
+                    <span>Q{idx + 1}. {q.questionText}</span>
+                    <span>[{q.marks} Marks]</span>
                   </div>
-
                   {q.type === "mcq" && q.options && (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "8px", paddingLeft: "16px", fontSize: "0.88rem" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", paddingLeft: "14px", fontSize: "0.85rem", marginTop: "6px" }}>
                       {q.options.map((opt, oIdx) => (
-                        <div key={oIdx}>
-                          ({String.fromCharCode(97 + oIdx)}) {opt}
-                        </div>
+                        <div key={oIdx}>({String.fromCharCode(97 + oIdx)}) {opt}</div>
                       ))}
-                    </div>
-                  )}
-
-                  {q.type === "code" && (
-                    <div style={{ marginTop: "8px", padding: "10px", background: "#f1f5f9", borderRadius: "6px", fontFamily: "monospace", fontSize: "0.82rem", color: "#334155" }}>
-                      // Provide code implementation or pseudocode below
                     </div>
                   )}
                 </div>
               ))}
             </div>
 
-            {/* End of paper */}
-            <div style={{ textAlign: "center", marginTop: "32px", fontSize: "0.8rem", color: "#94a3b8", fontWeight: 700, letterSpacing: "0.1em" }}>
-              --- END OF EXAMINATION QUESTION PAPER ---
+            <div style={{ textAlign: "center", marginTop: "28px", fontSize: "0.78rem", color: "#94a3b8", fontWeight: 700 }}>
+              --- END OF QUESTION PAPER ---
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal: Schedule New Batch */}
+      {/* 7. Modal: Schedule Batch */}
       {showBatchModal && (
         <div style={{
           position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          inset: 0,
           background: "rgba(0,0,0,0.8)",
           backdropFilter: "blur(6px)",
           display: "flex",
@@ -2329,11 +2010,11 @@ export default function App() {
           padding: "20px",
           zIndex: 9999
         }}>
-          <div className="glass-panel" style={{ maxWidth: "540px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
-            <h3 style={{ fontSize: "1.25rem", fontWeight: 800, marginBottom: "16px" }}>Schedule New Batch</h3>
+          <div className="glass-panel" style={{ maxWidth: "520px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
+            <h3 style={{ fontSize: "1.2rem", fontWeight: 800, marginBottom: "16px" }}>Schedule New Batch</h3>
             <form onSubmit={handleCreateBatch}>
-              <div style={{ marginBottom: "14px" }}>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Course Program</label>
+              <div style={{ marginBottom: "12px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Course</label>
                 <select
                   value={newBatch.courseId}
                   onChange={(e) => setNewBatch({ ...newBatch, courseId: e.target.value })}
@@ -2345,19 +2026,19 @@ export default function App() {
                 </select>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Batch Code</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Batch Code</label>
                   <input
                     type="text"
-                    placeholder="e.g. FSWD-B15"
+                    placeholder="e.g. FSWD-B1"
                     value={newBatch.batchCode}
                     onChange={(e) => setNewBatch({ ...newBatch, batchCode: e.target.value })}
                     style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Capacity (Seats)</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Capacity</label>
                   <input
                     type="number"
                     value={newBatch.capacity}
@@ -2367,9 +2048,9 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Timetable Slot</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Timetable Slot</label>
                   <select
                     value={newBatch.timeSlot}
                     onChange={(e) => setNewBatch({ ...newBatch, timeSlot: e.target.value })}
@@ -2381,7 +2062,7 @@ export default function App() {
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Start Date</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Start Date</label>
                   <input
                     type="date"
                     value={newBatch.startDate}
@@ -2391,9 +2072,9 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "18px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Assigned Lab / Hall</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Lab</label>
                   <select
                     value={newBatch.lab}
                     onChange={(e) => setNewBatch({ ...newBatch, lab: e.target.value })}
@@ -2401,18 +2082,31 @@ export default function App() {
                   >
                     <option value="Computer Lab 1">Computer Lab 1</option>
                     <option value="Computer Lab 2">Computer Lab 2</option>
-                    <option value="Audio-Visual Language Lab">Audio-Visual Language Lab</option>
-                    <option value="Seminar Hall B">Seminar Hall B</option>
+                    <option value="Language Audio-Visual Lab">Language Audio-Visual Lab</option>
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Trainer</label>
-                  <input
-                    type="text"
-                    value={newBatch.instructor}
-                    onChange={(e) => setNewBatch({ ...newBatch, instructor: e.target.value })}
-                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
-                  />
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Instructor</label>
+                  {teachers.length > 0 ? (
+                    <select
+                      value={newBatch.instructor}
+                      onChange={(e) => setNewBatch({ ...newBatch, instructor: e.target.value })}
+                      style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                    >
+                      <option value="">-- Select Instructor --</option>
+                      {teachers.map(t => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Instructor Name"
+                      value={newBatch.instructor}
+                      onChange={(e) => setNewBatch({ ...newBatch, instructor: e.target.value })}
+                      style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                    />
+                  )}
                 </div>
               </div>
 
@@ -2425,14 +2119,11 @@ export default function App() {
         </div>
       )}
 
-      {/* Modal: Record Fee Payment */}
+      {/* 8. Modal: Record Fee */}
       {showFeeModal && selectedStudentForFee && (
         <div style={{
           position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          inset: 0,
           background: "rgba(0,0,0,0.8)",
           backdropFilter: "blur(6px)",
           display: "flex",
@@ -2441,63 +2132,40 @@ export default function App() {
           padding: "20px",
           zIndex: 9999
         }}>
-          <div className="glass-panel" style={{ maxWidth: "480px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)" }}>
-            <h3 style={{ fontSize: "1.2rem", fontWeight: 800, marginBottom: "12px" }}>
-              Record Fee Payment
-            </h3>
-
-            <div style={{ padding: "12px", background: "rgba(0,0,0,0.25)", borderRadius: "8px", marginBottom: "16px", fontSize: "0.9rem" }}>
+          <div className="glass-panel" style={{ maxWidth: "460px", width: "100%", padding: "26px", borderRadius: "var(--radius-lg)" }}>
+            <h3 style={{ fontSize: "1.15rem", fontWeight: 800, marginBottom: "12px" }}>Record Fee Payment</h3>
+            <div style={{ padding: "10px", background: "rgba(0,0,0,0.25)", borderRadius: "8px", marginBottom: "14px", fontSize: "0.85rem" }}>
               <div>Student: <strong>{selectedStudentForFee.name}</strong></div>
-              <div style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>{selectedStudentForFee.course} ({selectedStudentForFee.batchCode})</div>
-              <div style={{ marginTop: "6px", display: "flex", justifyContent: "space-between" }}>
-                <span>Remaining Balance:</span>
-                <strong style={{ color: "#f87171" }}>
-                  PKR {(selectedStudentForFee.totalFee - selectedStudentForFee.paidFee).toLocaleString()}
-                </strong>
-              </div>
+              <div>Remaining: <strong style={{ color: "#f87171" }}>PKR {(selectedStudentForFee.totalFee - selectedStudentForFee.paidFee).toLocaleString()}</strong></div>
             </div>
 
             <form onSubmit={handleRecordPayment}>
-              <div style={{ marginBottom: "18px" }}>
-                <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>
-                  Payment Amount (PKR) *
-                </label>
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Payment Amount (PKR) *</label>
                 <input
                   type="number"
                   required
                   placeholder="e.g. 10000"
                   value={feePaymentAmount}
                   onChange={(e) => setFeePaymentAmount(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "12px",
-                    background: "rgba(0,0,0,0.3)",
-                    border: "1px solid var(--border-subtle)",
-                    borderRadius: "8px",
-                    color: "#ffffff",
-                    fontSize: "1.1rem",
-                    fontWeight: 700
-                  }}
+                  style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff", fontSize: "1rem", fontWeight: 700 }}
                 />
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
                 <button type="button" onClick={() => setShowFeeModal(false)} className="btn-secondary">Cancel</button>
-                <button type="submit" className="btn-primary">Generate Receipt & Save</button>
+                <button type="submit" className="btn-primary">Record Payment</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal: View & Print Official Fee Receipt */}
+      {/* 9. Modal: Receipt */}
       {receiptToPrint && (
         <div style={{
           position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          inset: 0,
           background: "rgba(0,0,0,0.85)",
           backdropFilter: "blur(6px)",
           display: "flex",
@@ -2506,55 +2174,45 @@ export default function App() {
           padding: "20px",
           zIndex: 9999
         }}>
-          <div className="glass-panel" style={{ maxWidth: "520px", width: "100%", padding: "32px", borderRadius: "var(--radius-lg)", background: "#0a0f1d", border: "1px solid rgba(255,255,255,0.15)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "16px", marginBottom: "16px" }}>
+          <div className="glass-panel" style={{ maxWidth: "480px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)", background: "#0a0f1d" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "12px", marginBottom: "14px" }}>
               <div>
-                <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#ffffff" }}>APEX EDUCATION FORUM</div>
-                <div style={{ fontSize: "0.72rem", color: "#38bdf8", textTransform: "uppercase" }}>Official Fee Receipt</div>
+                <div style={{ fontSize: "1rem", fontWeight: 900, color: "#ffffff" }}>APEX EDUCATION FORUM</div>
+                <div style={{ fontSize: "0.72rem", color: "#38bdf8" }}>Official Fee Receipt</div>
               </div>
-              <div style={{ textAlign: "right", fontSize: "0.78rem", color: "var(--text-dim)" }}>
+              <div style={{ textAlign: "right", fontSize: "0.75rem", color: "var(--text-dim)" }}>
                 <div>Receipt: {receiptToPrint.receiptNo}</div>
                 <div>Date: {receiptToPrint.date}</div>
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", fontSize: "0.9rem", marginBottom: "20px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "0.85rem", marginBottom: "18px" }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
                 <span style={{ color: "var(--text-dim)" }}>Received From:</span>
                 <strong>{receiptToPrint.studentName}</strong>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--text-dim)" }}>Course Program:</span>
+                <span style={{ color: "var(--text-dim)" }}>Course:</span>
                 <span>{receiptToPrint.course}</span>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "var(--text-dim)" }}>Batch Code:</span>
-                <span>{receiptToPrint.batchCode}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "10px", fontSize: "1.1rem" }}>
-                <span style={{ fontWeight: 700 }}>Amount Received:</span>
+              <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "8px", fontSize: "1rem" }}>
+                <span style={{ fontWeight: 700 }}>Amount Paid:</span>
                 <strong style={{ color: "#34d399" }}>PKR {receiptToPrint.amountPaid.toLocaleString()}</strong>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-dim)", fontSize: "0.85rem" }}>
-                <span>Remaining Balance:</span>
+              <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-dim)", fontSize: "0.82rem" }}>
+                <span>Remaining:</span>
                 <span>PKR {receiptToPrint.remainingBalance.toLocaleString()}</span>
               </div>
             </div>
 
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ fontSize: "0.75rem", color: "#10b981", display: "flex", alignItems: "center", gap: "6px" }}>
-                <CheckCircle2 size={16} />
-                <span>Verified by Apex Accounts</span>
-              </div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button onClick={() => window.print()} className="btn-secondary" style={{ padding: "8px 14px", fontSize: "0.85rem" }}>
-                  <Printer size={15} />
-                  <span>Print Receipt</span>
-                </button>
-                <button onClick={() => setReceiptToPrint(null)} className="btn-primary" style={{ padding: "8px 16px", fontSize: "0.85rem" }}>
-                  Done
-                </button>
-              </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+              <button onClick={() => window.print()} className="btn-secondary" style={{ padding: "6px 12px", fontSize: "0.82rem" }}>
+                <Printer size={14} />
+                <span>Print</span>
+              </button>
+              <button onClick={() => setReceiptToPrint(null)} className="btn-primary" style={{ padding: "6px 14px", fontSize: "0.82rem" }}>
+                Done
+              </button>
             </div>
           </div>
         </div>

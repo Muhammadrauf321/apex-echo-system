@@ -1,4 +1,4 @@
-import { DEMO_USERS } from "./seedData.js";
+import { ADMIN_USER } from "./seedData.js";
 import { auth, db } from "./firebaseConfig.js";
 import { 
   signInWithEmailAndPassword, 
@@ -10,21 +10,22 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 
 const CURRENT_USER_KEY = "apex_current_user";
 
-// Load initial user from localStorage or default to Director
+// Load initial user from localStorage or default to the verified Admin account
 export function getCurrentUser() {
   const saved = localStorage.getItem(CURRENT_USER_KEY);
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.uid) return parsed;
     } catch (e) {
       console.error("Error parsing saved user:", e);
     }
   }
-  // Default to Director so the user has full preview access immediately
-  return DEMO_USERS[0];
+  // Default strictly to the verified Admin identity
+  return ADMIN_USER;
 }
 
-// Set current user (for demo switching or after real login)
+// Set current user
 export function setCurrentUser(user) {
   if (!user) {
     localStorage.removeItem(CURRENT_USER_KEY);
@@ -35,22 +36,12 @@ export function setCurrentUser(user) {
   window.dispatchEvent(new CustomEvent("apex_auth_changed", { detail: user }));
 }
 
-// Switch between demo accounts instantly
-export function switchDemoUser(uid) {
-  const target = DEMO_USERS.find(u => u.uid === uid);
-  if (target) {
-    setCurrentUser(target);
-    return target;
-  }
-  return null;
-}
-
 // Real Firebase Auth listener
 export function subscribeToAuth(callback) {
   // 1. Initial callback with local state
   callback(getCurrentUser());
 
-  // 2. Listen to custom event for demo user switches
+  // 2. Listen to custom event for auth changes
   const handleCustomAuth = (e) => {
     callback(e.detail);
   };
@@ -62,22 +53,27 @@ export function subscribeToAuth(callback) {
       try {
         const userDocRef = doc(db, "users", fbUser.uid);
         const userSnap = await getDoc(userDocRef);
+        let profile = null;
         if (userSnap.exists()) {
-          const profile = userSnap.data();
-          setCurrentUser(profile);
-          callback(profile);
+          profile = userSnap.data();
         } else {
-          const basicProfile = {
+          // If this is Muhammad Rauf's email, give Director/Admin role
+          const isAdminEmail = fbUser.email === "muhammadraufbaloch6@gmail.com" || fbUser.email === ADMIN_USER.email;
+          profile = {
             uid: fbUser.uid,
             name: fbUser.displayName || fbUser.email.split("@")[0],
             email: fbUser.email,
-            role: "student",
+            role: isAdminEmail ? "director" : "student",
             avatar: fbUser.photoURL || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"
           };
-          await setDoc(userDocRef, basicProfile);
-          setCurrentUser(basicProfile);
-          callback(basicProfile);
+          try {
+            await setDoc(userDocRef, profile);
+          } catch (e) {
+            // Ignore if firestore rules prevent writing unauthenticated
+          }
         }
+        setCurrentUser(profile);
+        callback(profile);
       } catch (err) {
         console.warn("Firestore user sync warning:", err);
       }
@@ -96,11 +92,12 @@ export async function loginWithEmail(email, password) {
     const cred = await signInWithEmailAndPassword(auth, email, password);
     const userDocRef = doc(db, "users", cred.user.uid);
     const userSnap = await getDoc(userDocRef);
+    const isAdminEmail = cred.user.email === "muhammadraufbaloch6@gmail.com" || cred.user.email === ADMIN_USER.email;
     let profile = {
       uid: cred.user.uid,
       email: cred.user.email,
       name: cred.user.displayName || email.split("@")[0],
-      role: "student"
+      role: isAdminEmail ? "director" : "student"
     };
     if (userSnap.exists()) {
       profile = userSnap.data();
@@ -117,9 +114,8 @@ export async function logout() {
   try {
     await fbSignOut(auth);
   } catch (e) {
-    // Ignore if not signed in via FB
+    // Ignore
   }
-  // Reset to guest / first demo
   setCurrentUser(null);
   return { success: true };
 }

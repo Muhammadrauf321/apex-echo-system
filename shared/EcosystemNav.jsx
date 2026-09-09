@@ -1,26 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { getCurrentUser, setCurrentUser, subscribeToAuth, logout } from "./auth.js";
-import { DEMO_USERS } from "./seedData.js";
+import { getCurrentUser, subscribeToAuth, logout, loginWithEmail } from "./auth.js";
 import { ROLES, ROLE_LABELS } from "./constants.js";
 import { 
   Globe, 
   MessageSquare, 
   LayoutDashboard, 
-  UserCheck, 
-  ChevronDown, 
   LogOut,
   User,
-  Shield,
-  GraduationCap,
-  BookOpen,
   X,
-  CheckCircle2
+  Lock
 } from "lucide-react";
 
 export default function EcosystemNav({ currentApp = "website" }) {
   const [user, setUser] = useState(getCurrentUser());
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeToAuth((updatedUser) => {
@@ -56,34 +53,37 @@ export default function EcosystemNav({ currentApp = "website" }) {
     }
   ];
 
-  const handleSelectAccount = (targetUser) => {
-    setCurrentUser(targetUser);
-    setShowAuthModal(false);
-    setDropdownOpen(false);
-  };
-
   const handleLogout = async () => {
     await logout();
-    setDropdownOpen(false);
-    setShowAuthModal(true);
+    setUser(null);
   };
 
-  // Group accounts strictly by Role
-  const adminAccounts = DEMO_USERS.filter(u => u.role === ROLES.DIRECTOR || u.role === ROLES.MANAGER);
-  const teacherAccounts = DEMO_USERS.filter(u => u.role === ROLES.INSTRUCTOR);
-  const studentAccounts = DEMO_USERS.filter(u => u.role === ROLES.STUDENT);
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    setLoginError("");
+    setIsSubmitting(true);
+    const res = await loginWithEmail(loginEmail, loginPassword);
+    setIsSubmitting(false);
+    if (res.success) {
+      setShowLoginModal(false);
+      setLoginEmail("");
+      setLoginPassword("");
+    } else {
+      setLoginError(res.error || "Authentication failed. Please check credentials.");
+    }
+  };
 
-  const getRoleBadgeStyle = (role) => {
+  const getRoleBadge = (role) => {
     if (role === ROLES.DIRECTOR || role === ROLES.MANAGER) {
-      return { bg: "rgba(99, 102, 241, 0.2)", color: "#a5b4fc", border: "rgba(99, 102, 241, 0.4)", label: "Admin" };
+      return { bg: "rgba(99, 102, 241, 0.2)", color: "#a5b4fc", border: "rgba(99, 102, 241, 0.4)", label: "ADMIN" };
     }
     if (role === ROLES.INSTRUCTOR) {
-      return { bg: "rgba(16, 185, 129, 0.2)", color: "#34d399", border: "rgba(16, 185, 129, 0.4)", label: "Teacher" };
+      return { bg: "rgba(16, 185, 129, 0.2)", color: "#34d399", border: "rgba(16, 185, 129, 0.4)", label: "TEACHER" };
     }
-    return { bg: "rgba(245, 158, 11, 0.2)", color: "#fbbf24", border: "rgba(245, 158, 11, 0.4)", label: "Student" };
+    return { bg: "rgba(245, 158, 11, 0.2)", color: "#fbbf24", border: "rgba(245, 158, 11, 0.4)", label: "STUDENT" };
   };
 
-  const badge = user ? getRoleBadgeStyle(user.role) : { bg: "rgba(148, 163, 184, 0.2)", color: "#94a3b8", border: "transparent", label: "Guest" };
+  const badge = user ? getRoleBadge(user.role) : null;
 
   return (
     <header className="ecosystem-nav">
@@ -137,146 +137,85 @@ export default function EcosystemNav({ currentApp = "website" }) {
           })}
         </nav>
 
-        {/* Current Authenticated User & Account Menu */}
-        <div style={{ position: "relative" }}>
+        {/* User Identity Display & Logout — NO ROLE TOGGLES OR SWITCHERS */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           {user ? (
-            <button
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                background: "rgba(255, 255, 255, 0.05)",
-                border: "1px solid rgba(255, 255, 255, 0.14)",
-                borderRadius: "12px",
-                padding: "6px 14px",
-                color: "#ffffff",
-                cursor: "pointer",
-                transition: "all 0.2s ease"
-              }}
-            >
-              <img
-                src={user.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
-                alt={user.name}
-                style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }}
-              />
-              <div style={{ textAlign: "left" }}>
-                <div style={{ fontSize: "0.86rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span>{user.name}</span>
-                  <span style={{
-                    fontSize: "0.68rem",
-                    padding: "2px 6px",
-                    borderRadius: "6px",
-                    background: badge.bg,
-                    color: badge.color,
-                    border: `1px solid ${badge.border}`,
-                    fontWeight: 800,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.03em"
-                  }}>
-                    {badge.label}
-                  </span>
-                </div>
-                <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                  ID: {user.uid}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  background: "rgba(255, 255, 255, 0.05)",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  borderRadius: "12px",
+                  padding: "6px 14px"
+                }}
+              >
+                <img
+                  src={user.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"}
+                  alt={user.name}
+                  style={{ width: "30px", height: "30px", borderRadius: "50%", objectFit: "cover" }}
+                />
+                <div>
+                  <div style={{ fontSize: "0.86rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span>{user.name}</span>
+                    <span style={{
+                      fontSize: "0.68rem",
+                      padding: "2px 6px",
+                      borderRadius: "6px",
+                      background: badge.bg,
+                      color: badge.color,
+                      border: `1px solid ${badge.border}`,
+                      fontWeight: 800,
+                      letterSpacing: "0.03em"
+                    }}>
+                      {badge.label}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                    {user.email}
+                  </div>
                 </div>
               </div>
-              <ChevronDown size={14} color="#94a3b8" />
-            </button>
+
+              <button
+                onClick={handleLogout}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "8px 12px",
+                  borderRadius: "10px",
+                  border: "1px solid rgba(239, 68, 68, 0.3)",
+                  background: "rgba(239, 68, 68, 0.1)",
+                  color: "#f87171",
+                  fontSize: "0.82rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease"
+                }}
+                title="Sign Out of Account"
+              >
+                <LogOut size={15} />
+                <span>Sign Out</span>
+              </button>
+            </div>
           ) : (
             <button
-              onClick={() => setShowAuthModal(true)}
+              onClick={() => setShowLoginModal(true)}
               className="btn-primary"
-              style={{ fontSize: "0.88rem", padding: "8px 16px" }}
+              style={{ fontSize: "0.88rem", padding: "8px 18px", display: "flex", alignItems: "center", gap: "6px" }}
             >
               <User size={16} />
               <span>Log In</span>
             </button>
           )}
-
-          {dropdownOpen && user && (
-            <div
-              style={{
-                position: "absolute",
-                top: "calc(100% + 10px)",
-                right: 0,
-                width: "300px",
-                background: "#0f172a",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
-                borderRadius: "14px",
-                boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
-                padding: "16px",
-                zIndex: 9999
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", paddingBottom: "12px", borderBottom: "1px solid rgba(255, 255, 255, 0.08)" }}>
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  style={{ width: "42px", height: "42px", borderRadius: "50%", objectFit: "cover" }}
-                />
-                <div>
-                  <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#fff" }}>{user.name}</div>
-                  <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{user.email}</div>
-                  <div style={{ fontSize: "0.72rem", color: badge.color, fontWeight: 600, marginTop: "2px" }}>
-                    {user.title || ROLE_LABELS[user.role]}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "12px" }}>
-                <button
-                  onClick={() => {
-                    setDropdownOpen(false);
-                    setShowAuthModal(true);
-                  }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid rgba(255, 255, 255, 0.08)",
-                    background: "rgba(255, 255, 255, 0.04)",
-                    color: "#cbd5e1",
-                    fontSize: "0.85rem",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontWeight: 600
-                  }}
-                >
-                  <User size={16} color="#38bdf8" />
-                  <span>Switch Account / Sign In</span>
-                </button>
-
-                <button
-                  onClick={handleLogout}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: "rgba(239, 68, 68, 0.12)",
-                    color: "#f87171",
-                    fontSize: "0.85rem",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontWeight: 600
-                  }}
-                >
-                  <LogOut size={16} />
-                  <span>Sign Out</span>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Account Authentication & Selection Modal with Strict Role Segregation */}
-      {showAuthModal && (
+      {/* Clean Sign In Modal (Only shown when logged out) */}
+      {showLoginModal && (
         <div style={{
           position: "fixed",
           inset: 0,
@@ -293,164 +232,69 @@ export default function EcosystemNav({ currentApp = "website" }) {
             border: "1px solid rgba(255, 255, 255, 0.12)",
             borderRadius: "18px",
             width: "100%",
-            maxWidth: "680px",
-            maxHeight: "90vh",
-            overflowY: "auto",
-            boxShadow: "0 25px 60px rgba(0,0,0,0.8)",
-            padding: "24px"
+            maxWidth: "420px",
+            padding: "28px",
+            boxShadow: "0 25px 60px rgba(0,0,0,0.8)"
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: "14px" }}>
-              <div>
-                <h2 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#ffffff", letterSpacing: "-0.01em" }}>
-                  Apex Unified Identity Access
-                </h2>
-                <p style={{ fontSize: "0.82rem", color: "#94a3b8", marginTop: "3px" }}>
-                  Select an account to log in. Each role has separate permissions and dedicated portals.
-                </p>
-              </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#ffffff" }}>
+                Sign In to Apex Ecosystem
+              </h3>
               <button
-                onClick={() => setShowAuthModal(false)}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "#94a3b8",
-                  cursor: "pointer",
-                  padding: "6px"
-                }}
+                onClick={() => setShowLoginModal(false)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* Section 1: Administrative Staff */}
-            <div style={{ marginBottom: "20px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-                <Shield size={16} color="#818cf8" />
-                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#818cf8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Executive & Admissions Administration
-                </span>
+            {loginError && (
+              <div style={{ padding: "10px 12px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "8px", color: "#f87171", fontSize: "0.82rem", marginBottom: "16px" }}>
+                {loginError}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                {adminAccounts.map((acc) => {
-                  const isCurrent = user?.uid === acc.uid;
-                  return (
-                    <button
-                      key={acc.uid}
-                      onClick={() => handleSelectAccount(acc)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        padding: "12px",
-                        borderRadius: "12px",
-                        background: isCurrent ? "rgba(99, 102, 241, 0.18)" : "rgba(255, 255, 255, 0.03)",
-                        border: isCurrent ? "1px solid #6366f1" : "1px solid rgba(255, 255, 255, 0.08)",
-                        color: "#fff",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all 0.2s ease"
-                      }}
-                    >
-                      <img src={acc.avatar} alt={acc.name} style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover" }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "0.88rem", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acc.name}</div>
-                        <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>{acc.title}</div>
-                        <div style={{ fontSize: "0.68rem", color: "#818cf8", marginTop: "2px" }}>ID: {acc.uid}</div>
-                      </div>
-                      {isCurrent && <CheckCircle2 size={16} color="#818cf8" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            )}
 
-            {/* Section 2: Faculty & Instructors */}
-            <div style={{ marginBottom: "20px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-                <BookOpen size={16} color="#34d399" />
-                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#34d399", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Teaching Faculty & Instructors
-                </span>
+            <form onSubmit={handleLoginSubmit}>
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "6px", color: "#cbd5e1" }}>
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="name@apex.edu or gmail"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  style={{ width: "100%", padding: "10px", background: "#060911", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", color: "#ffffff" }}
+                />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                {teacherAccounts.map((acc) => {
-                  const isCurrent = user?.uid === acc.uid;
-                  return (
-                    <button
-                      key={acc.uid}
-                      onClick={() => handleSelectAccount(acc)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        padding: "12px",
-                        borderRadius: "12px",
-                        background: isCurrent ? "rgba(16, 185, 129, 0.18)" : "rgba(255, 255, 255, 0.03)",
-                        border: isCurrent ? "1px solid #10b981" : "1px solid rgba(255, 255, 255, 0.08)",
-                        color: "#fff",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all 0.2s ease"
-                      }}
-                    >
-                      <img src={acc.avatar} alt={acc.name} style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover" }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "0.88rem", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acc.name}</div>
-                        <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>{acc.title}</div>
-                        <div style={{ fontSize: "0.68rem", color: "#34d399", marginTop: "2px" }}>ID: {acc.uid}</div>
-                      </div>
-                      {isCurrent && <CheckCircle2 size={16} color="#34d399" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
 
-            {/* Section 3: Students */}
-            <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-                <GraduationCap size={16} color="#fbbf24" />
-                <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "#fbbf24", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  Enrolled Students
-                </span>
+              <div style={{ marginBottom: "20px" }}>
+                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "6px", color: "#cbd5e1" }}>
+                  Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  style={{ width: "100%", padding: "10px", background: "#060911", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", color: "#ffffff" }}
+                />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                {studentAccounts.map((acc) => {
-                  const isCurrent = user?.uid === acc.uid;
-                  return (
-                    <button
-                      key={acc.uid}
-                      onClick={() => handleSelectAccount(acc)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        padding: "12px",
-                        borderRadius: "12px",
-                        background: isCurrent ? "rgba(245, 158, 11, 0.18)" : "rgba(255, 255, 255, 0.03)",
-                        border: isCurrent ? "1px solid #f59e0b" : "1px solid rgba(255, 255, 255, 0.08)",
-                        color: "#fff",
-                        cursor: "pointer",
-                        textAlign: "left",
-                        transition: "all 0.2s ease"
-                      }}
-                    >
-                      <img src={acc.avatar} alt={acc.name} style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover" }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "0.88rem", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{acc.name}</div>
-                        <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>{acc.courseTitle}</div>
-                        <div style={{ fontSize: "0.68rem", color: "#fbbf24", marginTop: "2px" }}>Roll: {acc.studentId}</div>
-                      </div>
-                      {isCurrent && <CheckCircle2 size={16} color="#fbbf24" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn-primary"
+                style={{ width: "100%", padding: "11px", fontWeight: 700 }}
+              >
+                {isSubmitting ? "Verifying..." : "Sign In"}
+              </button>
+            </form>
           </div>
         </div>
       )}
     </header>
   );
 }
-

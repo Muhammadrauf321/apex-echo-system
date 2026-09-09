@@ -4,12 +4,13 @@ import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyA6zw52EVPzuS4TbsqmYfhvEv3LI-S6pJM",
-  authDomain: "apex-echo-system.firebaseapp.com",
-  projectId: "apex-echo-system",
-  storageBucket: "apex-echo-system.firebasestorage.app",
-  messagingSenderId: "435515195879",
-  appId: "1:435515195879:web:ca2a63f06ebb82da90bd42"
+  projectId: "apex-education-forum",
+  appId: "1:565567118952:web:a9177956f3b5a1072225dd",
+  storageBucket: "apex-education-forum.firebasestorage.app",
+  apiKey: "AIzaSyDeEuWXvLcc_QG0kfX7d3y9AQEDdm8g2yk",
+  authDomain: "apex-education-forum.firebaseapp.com",
+  messagingSenderId: "565567118952",
+  measurementId: "G-K905LZVESC"
 };
 
 // Initialize Firebase App
