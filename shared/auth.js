@@ -1,4 +1,4 @@
-import { ADMIN_USER } from "./seedData.js";
+import { ADMIN_USER, DEMO_USERS } from "./seedData.js";
 import { auth, db } from "./firebaseConfig.js";
 import { 
   signInWithEmailAndPassword, 
@@ -33,18 +33,28 @@ const safeStorage = {
   }
 };
 
-// Initial accounts seed: only the verified Admin
+// Initial accounts seed: Admin + Faculty + Students
 function initAccounts() {
+  if (safeStorage.getItem("apex_accounts_restored_v5") !== "true") {
+    const initial = (DEMO_USERS || [ADMIN_USER]).map(u => ({
+      ...u,
+      status: "active",
+      isFirstLogin: false,
+      password: "password123"
+    }));
+    safeStorage.setItem(ACCOUNTS_KEY, JSON.stringify(initial));
+    safeStorage.setItem("apex_accounts_restored_v5", "true");
+    return;
+  }
+
   const existing = safeStorage.getItem(ACCOUNTS_KEY);
   if (!existing) {
-    const initial = [
-      {
-        ...ADMIN_USER,
-        status: "active",
-        isFirstLogin: false,
-        password: "password123" // Default dev password for Admin
-      }
-    ];
+    const initial = (DEMO_USERS || [ADMIN_USER]).map(u => ({
+      ...u,
+      status: "active",
+      isFirstLogin: false,
+      password: "password123"
+    }));
     safeStorage.setItem(ACCOUNTS_KEY, JSON.stringify(initial));
   }
 }
