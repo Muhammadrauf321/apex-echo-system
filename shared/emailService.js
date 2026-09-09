@@ -2,24 +2,32 @@ import emailjs from "@emailjs/browser";
 
 const EMAILJS_STORAGE_KEY = "apex_emailjs_config";
 
+const DEFAULT_CONFIG = {
+  serviceId: "service_fg9773t",
+  templateId: "",
+  publicKey: "",
+  isEnabled: true
+};
+
 // Default or persisted configuration
 export function getEmailJSConfig() {
   if (typeof window === "undefined" || typeof localStorage === "undefined") {
-    return { serviceId: "", templateId: "", publicKey: "", isEnabled: false };
+    return { ...DEFAULT_CONFIG };
   }
   try {
     const saved = localStorage.getItem(EMAILJS_STORAGE_KEY);
     if (saved) {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      return {
+        serviceId: parsed.serviceId || DEFAULT_CONFIG.serviceId,
+        templateId: parsed.templateId || DEFAULT_CONFIG.templateId,
+        publicKey: parsed.publicKey || DEFAULT_CONFIG.publicKey,
+        isEnabled: parsed.isEnabled !== undefined ? parsed.isEnabled : true
+      };
     }
   } catch (e) {}
 
-  return {
-    serviceId: "",
-    templateId: "",
-    publicKey: "",
-    isEnabled: false
-  };
+  return { ...DEFAULT_CONFIG };
 }
 
 export function saveEmailJSConfig(config) {
