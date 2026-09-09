@@ -1,4 +1,4 @@
-import { ADMIN_USER, DEMO_USERS } from "./seedData.js";
+import { ADMIN_USER } from "./seedData.js";
 import { auth, db } from "./firebaseConfig.js";
 import { 
   signInWithEmailAndPassword, 
@@ -12,6 +12,7 @@ const CURRENT_USER_KEY = "apex_current_user";
 const ACCOUNTS_KEY = "apex_registered_accounts";
 const INVITATIONS_KEY = "apex_invitations";
 const EMAILS_KEY = "apex_dispatched_emails";
+const SESSION_COOKIE_NAME = "apex_session_uid";
 
 const safeStorage = {
   getItem: (k) => {
@@ -33,28 +34,69 @@ const safeStorage = {
   }
 };
 
-// Initial accounts seed: Admin + Faculty + Students
+// --- Cross-Port Cookie Synchronization (RFC 6265: cookies are shared across all ports on localhost) ---
+function setCrossPortCookie(name, value, days = 7) {
+  if (typeof document === "undefined") return;
+  let expires = "";
+  if (days) {
+    const date = new Date();
+    date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+    expires = "; expires=" + date.toUTCString();
+  }
+  const encoded = encodeURIComponent(value);
+  document.cookie = `${name}=${encoded}${expires}; path=/; SameSite=Lax`;
+}
+
+function getCrossPortCookie(name) {
+  if (typeof document === "undefined") return null;
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(";");
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) === " ") c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) === 0) {
+      try {
+        return decodeURIComponent(c.substring(nameEQ.length, c.length));
+      } catch (e) {
+        return c.substring(nameEQ.length, c.length);
+      }
+    }
+  }
+  return null;
+}
+
+function deleteCrossPortCookie(name) {
+  if (typeof document === "undefined") return;
+  document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax`;
+}
+
+// Initial accounts seed: ONLY the real verified Admin (zero mock teachers/students)
 function initAccounts() {
-  if (safeStorage.getItem("apex_accounts_restored_v5") !== "true") {
-    const initial = (DEMO_USERS || [ADMIN_USER]).map(u => ({
-      ...u,
-      status: "active",
-      isFirstLogin: false,
-      password: "password123"
-    }));
+  // Purge any stale demo accounts from storage
+  if (safeStorage.getItem("apex_accounts_fresh_v7") !== "true") {
+    const initial = [
+      {
+        ...ADMIN_USER,
+        status: "active",
+        isFirstLogin: false,
+        password: "password123"
+      }
+    ];
     safeStorage.setItem(ACCOUNTS_KEY, JSON.stringify(initial));
-    safeStorage.setItem("apex_accounts_restored_v5", "true");
+    safeStorage.setItem("apex_accounts_fresh_v7", "true");
     return;
   }
 
   const existing = safeStorage.getItem(ACCOUNTS_KEY);
   if (!existing) {
-    const initial = (DEMO_USERS || [ADMIN_USER]).map(u => ({
-      ...u,
-      status: "active",
-      isFirstLogin: false,
-      password: "password123"
-    }));
+    const initial = [
+      {
+        ...ADMIN_USER,
+        status: "active",
+        isFirstLogin: false,
+        password: "password123"
+      }
+    ];
     safeStorage.setItem(ACCOUNTS_KEY, JSON.stringify(initial));
   }
 }
@@ -63,7 +105,7 @@ initAccounts();
 // Get all registered accounts
 export function getRegisteredAccounts() {
   try {
-    const data = localStorage.getItem(ACCOUNTS_KEY);
+    const data = safeStorage.getItem(ACCOUNTS_KEY);
     return data ? JSON.parse(data) : [ADMIN_USER];
   } catch (e) {
     return [ADMIN_USER];
@@ -79,53 +121,100 @@ export function saveRegisteredAccount(account) {
   } else {
     accounts.push(account);
   }
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+  safeStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
 }
 
-// Current User management
+// Current User management - strictly synced via cross-port cookie (ZERO AUTO-LOGIN)
 export function getCurrentUser() {
-  const saved = localStorage.getItem(CURRENT_USER_KEY);
-  if (saved === "null") {
+  if (typeof window === "undefined") return null;
+
+  // 1. Check cross-port session cookie
+  const sessionUid = getCrossPortCookie(SESSION_COOKIE_NAME);
+  if (!sessionUid || sessionUid === "null" || sessionUid === "undefined") {
+    // If no session cookie exists, user is strictly logged out across all ports
+    safeStorage.setItem(CURRENT_USER_KEY, "null");
     return null;
   }
-  if (saved) {
+
+  // 2. Check if local storage matches session cookie
+  const saved = safeStorage.getItem(CURRENT_USER_KEY);
+  if (saved && saved !== "null") {
     try {
       const parsed = JSON.parse(saved);
-      if (parsed && parsed.uid) return parsed;
-    } catch (e) {
-      console.error("Error parsing saved user:", e);
-    }
+      if (parsed && (parsed.uid === sessionUid || parsed.email === sessionUid)) {
+        return parsed;
+      }
+    } catch (e) {}
   }
-  // If first time visiting and no user explicitly set, default to Admin
-  if (!localStorage.getItem("apex_has_session_initialized")) {
-    localStorage.setItem("apex_has_session_initialized", "true");
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(ADMIN_USER));
+
+  // 3. Resolve user by sessionUid from Admin or registered accounts
+  if (sessionUid === ADMIN_USER.uid || sessionUid === "usr_dir_01" || sessionUid.toLowerCase() === ADMIN_USER.email.toLowerCase()) {
+    safeStorage.setItem(CURRENT_USER_KEY, JSON.stringify(ADMIN_USER));
     return ADMIN_USER;
   }
+
+  const accounts = getRegisteredAccounts();
+  const matched = accounts.find(a => a.uid === sessionUid || a.email.toLowerCase() === sessionUid.toLowerCase());
+  if (matched) {
+    safeStorage.setItem(CURRENT_USER_KEY, JSON.stringify(matched));
+    return matched;
+  }
+
   return null;
 }
 
 export function setCurrentUser(user) {
   if (!user) {
-    localStorage.setItem(CURRENT_USER_KEY, "null");
+    deleteCrossPortCookie(SESSION_COOKIE_NAME);
+    deleteCrossPortCookie("apex_session_user");
+    safeStorage.setItem(CURRENT_USER_KEY, "null");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("apex_auth_changed", { detail: null }));
+    }
   } else {
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    setCrossPortCookie(SESSION_COOKIE_NAME, user.uid || user.email, 7);
+    safeStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("apex_auth_changed", { detail: user }));
+    }
   }
-  window.dispatchEvent(new CustomEvent("apex_auth_changed", { detail: user }));
 }
 
-// Real Firebase Auth listener
+// Real Cross-Port + Firebase Auth listener
 export function subscribeToAuth(callback) {
-  // 1. Initial callback with local state
+  let lastUid = getCrossPortCookie(SESSION_COOKIE_NAME);
   callback(getCurrentUser());
 
-  // 2. Listen to custom event for auth changes
+  // 1. Listen to local custom event
   const handleCustomAuth = (e) => {
+    lastUid = getCrossPortCookie(SESSION_COOKIE_NAME);
     callback(e.detail);
   };
-  window.addEventListener("apex_auth_changed", handleCustomAuth);
+  if (typeof window !== "undefined") {
+    window.addEventListener("apex_auth_changed", handleCustomAuth);
+  }
 
-  // 3. Listen to real Firebase Auth
+  // 2. Cross-Port Sync Handler: whenever tab gains focus or visibility changes
+  const checkCrossPortSync = () => {
+    const currentCookieUid = getCrossPortCookie(SESSION_COOKIE_NAME);
+    if (currentCookieUid !== lastUid) {
+      lastUid = currentCookieUid;
+      const currentUser = getCurrentUser();
+      callback(currentUser);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("apex_auth_changed", { detail: currentUser }));
+      }
+    }
+  };
+
+  let intervalId = null;
+  if (typeof window !== "undefined") {
+    window.addEventListener("focus", checkCrossPortSync);
+    window.addEventListener("visibilitychange", checkCrossPortSync);
+    intervalId = setInterval(checkCrossPortSync, 500);
+  }
+
+  // 3. Real Firebase Auth listener
   const unsubscribeFb = onAuthStateChanged(auth, async (fbUser) => {
     if (fbUser) {
       try {
@@ -138,19 +227,16 @@ export function subscribeToAuth(callback) {
           const isAdminEmail = fbUser.email === "muhammadraufbaloch6@gmail.com" || fbUser.email === ADMIN_USER.email;
           profile = {
             uid: fbUser.uid,
-            name: fbUser.displayName || fbUser.email.split("@")[0],
             email: fbUser.email,
+            name: fbUser.displayName || (isAdminEmail ? "Muhammad Rauf" : fbUser.email.split("@")[0]),
             role: isAdminEmail ? "director" : "student",
-            avatar: fbUser.photoURL || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"
+            status: "active"
           };
           try {
             await setDoc(userDocRef, profile);
-          } catch (e) {
-            // Ignore firestore write error
-          }
+          } catch (e) {}
         }
         setCurrentUser(profile);
-        callback(profile);
       } catch (err) {
         console.warn("Firestore user sync warning:", err);
       }
@@ -158,7 +244,12 @@ export function subscribeToAuth(callback) {
   });
 
   return () => {
-    window.removeEventListener("apex_auth_changed", handleCustomAuth);
+    if (typeof window !== "undefined") {
+      window.removeEventListener("apex_auth_changed", handleCustomAuth);
+      window.removeEventListener("focus", checkCrossPortSync);
+      window.removeEventListener("visibilitychange", checkCrossPortSync);
+      if (intervalId) clearInterval(intervalId);
+    }
     unsubscribeFb();
   };
 }
@@ -436,10 +527,12 @@ export async function loginWithEmail(email, password) {
     }
   }
 
-  // 3. Check Admin fallback
+  // 3. Check Admin fallback with password check
   if (cleanEmail === "muhammadraufbaloch6@gmail.com" || cleanEmail === ADMIN_USER.email.toLowerCase()) {
-    setCurrentUser(ADMIN_USER);
-    return { success: true, user: ADMIN_USER };
+    if (cleanPass === "password123" || cleanPass === "admin123" || cleanPass === "rauf123") {
+      setCurrentUser(ADMIN_USER);
+      return { success: true, user: ADMIN_USER };
+    }
   }
 
   // 4. Try live Firebase Auth

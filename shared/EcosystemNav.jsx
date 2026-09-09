@@ -378,27 +378,6 @@ export default function EcosystemNav({ currentApp = "website" }) {
                 </div>
               </div>
 
-              <button
-                onClick={() => setShowLoginModal(true)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "8px 12px",
-                  borderRadius: "10px",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  background: "rgba(255, 255, 255, 0.05)",
-                  color: "#cbd5e1",
-                  fontSize: "0.82rem",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  transition: "all 0.2s ease"
-                }}
-                title="Switch Account / Test Role"
-              >
-                <Users size={15} />
-                <span>Switch Role</span>
-              </button>
 
               <button
                 onClick={handleLogout}
@@ -840,71 +819,6 @@ export default function EcosystemNav({ currentApp = "website" }) {
                 {loginError}
               </div>
             )}
-
-            <div style={{ marginBottom: "16px", padding: "12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "12px" }}>
-              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>
-                Quick Test Switch (1-Click Login)
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin("muhammadraufbaloch6@gmail.com", "password123")}
-                  style={{
-                    padding: "7px 4px",
-                    borderRadius: "8px",
-                    border: "1px solid rgba(129, 140, 248, 0.4)",
-                    background: "rgba(99, 102, 241, 0.15)",
-                    color: "#c7d2fe",
-                    cursor: "pointer",
-                    textAlign: "center",
-                    fontSize: "0.72rem",
-                    fontWeight: 700
-                  }}
-                >
-                  👑 Admin
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin("bilal.ahmed@apex.edu", "password123")}
-                  style={{
-                    padding: "7px 4px",
-                    borderRadius: "8px",
-                    border: "1px solid rgba(52, 211, 153, 0.4)",
-                    background: "rgba(16, 185, 129, 0.15)",
-                    color: "#a7f3d0",
-                    cursor: "pointer",
-                    textAlign: "center",
-                    fontSize: "0.72rem",
-                    fontWeight: 700
-                  }}
-                >
-                  👨‍🏫 Teacher
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleQuickLogin("hamza.student@apex.edu", "password123")}
-                  style={{
-                    padding: "7px 4px",
-                    borderRadius: "8px",
-                    border: "1px solid rgba(251, 191, 36, 0.4)",
-                    background: "rgba(245, 158, 11, 0.15)",
-                    color: "#fde68a",
-                    cursor: "pointer",
-                    textAlign: "center",
-                    fontSize: "0.72rem",
-                    fontWeight: 700
-                  }}
-                >
-                  🎓 Student
-                </button>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", margin: "14px 0", color: "#64748b", fontSize: "0.72rem", fontWeight: 700 }}>
-              <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
-              <span>OR LOG IN WITH GMAIL</span>
-              <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
-            </div>
 
             <form onSubmit={handleLoginSubmit}>
               <div style={{ marginBottom: "14px" }}>

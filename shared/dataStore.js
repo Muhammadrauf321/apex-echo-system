@@ -31,120 +31,47 @@ const STORAGE_KEYS = {
   STUDENTS: "apex_students"
 };
 
-const DEFAULT_INQUIRIES = [
-  {
-    id: "inq_01",
-    name: "Danyal Sheikh",
-    phone: "+92 300 1234567",
-    email: "danyal.sheikh@gmail.com",
-    courseId: "it_web_fullstack",
-    courseTitle: "Full-Stack Web Development (MERN)",
-    preferredSlot: "Evening (05:30 PM - 07:30 PM)",
-    status: "pending",
-    date: "2026-09-06"
-  },
-  {
-    id: "inq_02",
-    name: "Mehwish Raza",
-    phone: "+92 321 9876543",
-    email: "mehwish.raza@gmail.com",
-    courseId: "lang_spoken_english",
-    courseTitle: "Spoken English & Fluency Mastery",
-    preferredSlot: "Morning (09:00 AM - 11:00 AM)",
-    status: "approved",
-    date: "2026-09-05"
-  }
-];
-
-const DEFAULT_TEACHERS = [
-  {
-    id: "usr_ins_01",
-    name: "Engr. Bilal Ahmed",
-    email: "bilal.ahmed@apex.edu",
-    department: "Computer Science & IT",
-    phone: "+92 300 4567890",
-    status: "active",
-    joinedDate: "2026-01-15"
-  },
-  {
-    id: "usr_ins_02",
-    name: "Sir Salman Tareen",
-    email: "salman.tareen@apex.edu",
-    department: "English & Foreign Languages",
-    phone: "+92 321 6549870",
-    status: "active",
-    joinedDate: "2026-02-01"
-  }
-];
-
-const DEFAULT_STUDENTS = [
-  {
-    id: "usr_std_01",
-    name: "Hamza Tariq",
-    email: "hamza.student@apex.edu",
-    phone: "+92 333 1122334",
-    rollNumber: "APEX-2026-0042",
-    batchCode: "FSWD-B14",
-    course: "Full-Stack Web Development (MERN)",
-    feePaid: 18000,
-    feeTotal: 28000,
-    feeStatus: "partial",
-    status: "active",
-    enrolledAt: "2026-08-20"
-  },
-  {
-    id: "usr_std_02",
-    name: "Zainab Fatima",
-    email: "zainab.student@apex.edu",
-    phone: "+92 312 4455667",
-    rollNumber: "APEX-2026-0089",
-    batchCode: "ENG-B22",
-    course: "Spoken English & Fluency Mastery",
-    feePaid: 15000,
-    feeTotal: 15000,
-    feeStatus: "paid",
-    status: "active",
-    enrolledAt: "2026-08-25"
-  }
-];
-
-// Seed initial storage with rich datasets
+// Seed initial storage with 100% clean, fresh real store
 function initLocalData() {
   if (typeof window === "undefined" || typeof localStorage === "undefined") return;
 
-  // Restore rich initial data if not present or if previously emptied
-  if (localStorage.getItem("apex_restored_rich_data_v5") !== "true") {
-    localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(SEED_COURSES));
-    localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(SEED_BATCHES));
-    localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(SEED_CERTIFICATES));
-    localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify(SEED_EXAMS));
-    localStorage.setItem(STORAGE_KEYS.INQUIRIES, JSON.stringify(DEFAULT_INQUIRIES));
-    localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(DEFAULT_TEACHERS));
-    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(DEFAULT_STUDENTS));
-    localStorage.setItem("apex_restored_rich_data_v5", "true");
-    return;
+  // Enforce 100% fresh startup purge: removes all old fake batches, exams, teachers, and students
+  if (localStorage.getItem("apex_fresh_clean_v7") !== "true") {
+    localStorage.removeItem(STORAGE_KEYS.BATCHES);
+    localStorage.removeItem(STORAGE_KEYS.CERTIFICATES);
+    localStorage.removeItem(STORAGE_KEYS.EXAMS);
+    localStorage.removeItem(STORAGE_KEYS.INQUIRIES);
+    localStorage.removeItem(STORAGE_KEYS.TEACHERS);
+    localStorage.removeItem(STORAGE_KEYS.STUDENTS);
+    localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.INQUIRIES, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify([]));
+    localStorage.setItem("apex_fresh_clean_v7", "true");
   }
 
   if (!localStorage.getItem(STORAGE_KEYS.COURSES)) {
     localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(SEED_COURSES));
   }
   if (!localStorage.getItem(STORAGE_KEYS.BATCHES)) {
-    localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(SEED_BATCHES));
+    localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.CERTIFICATES)) {
-    localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(SEED_CERTIFICATES));
+    localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.EXAMS)) {
-    localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify(SEED_EXAMS));
+    localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.INQUIRIES)) {
-    localStorage.setItem(STORAGE_KEYS.INQUIRIES, JSON.stringify(DEFAULT_INQUIRIES));
+    localStorage.setItem(STORAGE_KEYS.INQUIRIES, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.STUDENTS)) {
-    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(DEFAULT_STUDENTS));
+    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEYS.TEACHERS)) {
-    localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(DEFAULT_TEACHERS));
+    localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify([]));
   }
 }
 
