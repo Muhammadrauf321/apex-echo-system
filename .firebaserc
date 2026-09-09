@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "apex-education-forum"
-  }
+  },
+  "targets": {
+    "apex-education-forum": {
+      "hosting": {
+        "website": [
+          "apex-education-forum"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
