@@ -4,9 +4,11 @@ import { getCurrentUser, subscribeToAuth, createAccountInvitation, getInvitation
 import { generateGmailComposeUrl } from "@shared/emailService.js";
 import { 
   getCourses, 
+  subscribeToCourses,
   addCourse,
   updateCourse,
   deleteCourse,
+  deleteAllCourses,
   getBatches, 
   createBatch, 
   getInquiries, 
@@ -87,9 +89,11 @@ export default function App() {
   const [filterCourseCategory, setFilterCourseCategory] = useState("all");
   const [expandedSyllabusId, setExpandedSyllabusId] = useState(null);
   const [newModuleInput, setNewModuleInput] = useState("");
+  const [isCustomCategory, setIsCustomCategory] = useState(false);
+  const [customCategoryInput, setCustomCategoryInput] = useState("");
   const [courseForm, setCourseForm] = useState({
     title: "",
-    category: "Information Technology",
+    category: "",
     tagline: "",
     duration: "3 Months (12 Weeks)",
     sessionsPerWeek: "4 Days / Week (Daily 2 hrs)",
@@ -235,8 +239,12 @@ export default function App() {
     }
   }, [currentUser, isAdmin, isTeacher, isStudent]);
 
-  // Sync data store listeners
+  // Sync data store listeners (Cloud Firestore real-time + window events)
   useEffect(() => {
+    const unsubCourses = subscribeToCourses((liveCourses) => {
+      setCourses(liveCourses);
+    });
+
     const handleCourses = () => setCourses(getCourses());
     const handleInq = () => setInquiries(getInquiries());
     const handleBatches = () => setBatches(getBatches());
@@ -254,6 +262,7 @@ export default function App() {
     window.addEventListener("apex_certificates_changed", handleCerts);
 
     return () => {
+      unsubCourses();
       window.removeEventListener("apex_courses_changed", handleCourses);
       window.removeEventListener("apex_inquiries_changed", handleInq);
       window.removeEventListener("apex_batches_changed", handleBatches);
@@ -273,11 +282,17 @@ export default function App() {
   }, [statusBanner]);
 
   // Course Management Handlers (Admin)
+  const availableCategories = Array.from(
+    new Set(courses.map(c => c.category).filter(Boolean))
+  );
+
   const handleOpenCreateCourseModal = () => {
     setEditingCourse(null);
+    setIsCustomCategory(false);
+    setCustomCategoryInput("");
     setCourseForm({
       title: "",
-      category: "Information Technology",
+      category: "",
       tagline: "",
       duration: "3 Months (12 Weeks)",
       sessionsPerWeek: "4 Days / Week (Daily 2 hrs)",
@@ -298,9 +313,11 @@ export default function App() {
 
   const handleOpenEditCourseModal = (course) => {
     setEditingCourse(course);
+    setIsCustomCategory(false);
+    setCustomCategoryInput("");
     setCourseForm({
       title: course.title || "",
-      category: course.category || "Information Technology",
+      category: course.category || "",
       tagline: course.tagline || "",
       duration: course.duration || "3 Months (12 Weeks)",
       sessionsPerWeek: course.sessionsPerWeek || "4 Days / Week",
@@ -333,27 +350,35 @@ export default function App() {
     }));
   };
 
-  const handleSaveCourseSubmit = (e) => {
+  const handleSaveCourseSubmit = async (e) => {
     e.preventDefault();
-    if (!courseForm.title.trim()) return;
+    const finalCategory = (isCustomCategory ? customCategoryInput : courseForm.category).trim();
+
+    if (!courseForm.title.trim()) {
+      alert("Please enter a course title.");
+      return;
+    }
+    if (!finalCategory) {
+      alert("Please select an existing category or enter a new custom category.");
+      return;
+    }
+
+    const payload = {
+      ...courseForm,
+      category: finalCategory,
+      fee: Number(courseForm.fee),
+      installments: Number(courseForm.installments)
+    };
 
     if (editingCourse) {
-      updateCourse(editingCourse.id, {
-        ...courseForm,
-        fee: Number(courseForm.fee),
-        installments: Number(courseForm.installments)
-      });
+      await updateCourse(editingCourse.id, payload);
       setCourses(getCourses());
       setStatusBanner({
         type: "success",
         message: `Course "${courseForm.title}" updated successfully!`
       });
     } else {
-      addCourse({
-        ...courseForm,
-        fee: Number(courseForm.fee),
-        installments: Number(courseForm.installments)
-      });
+      await addCourse(payload);
       setCourses(getCourses());
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
       setStatusBanner({
@@ -364,13 +389,25 @@ export default function App() {
     setShowCourseModal(false);
   };
 
-  const handleDeleteCourse = (courseId, courseTitle) => {
-    if (window.confirm(`Are you sure you want to delete "${courseTitle}"? This will remove it from all course catalogs.`)) {
-      deleteCourse(courseId);
+  const handleDeleteCourse = async (courseId, courseTitle) => {
+    if (window.confirm(`Are you sure you want to delete "${courseTitle}"? This will remove it from LMS and the public website.`)) {
+      await deleteCourse(courseId);
       setCourses(getCourses());
       setStatusBanner({
         type: "warning",
         message: `Course "${courseTitle}" has been deleted.`
+      });
+    }
+  };
+
+  const handleDeleteAllCourses = async () => {
+    if (courses.length === 0) return;
+    if (window.confirm("CAUTION: Are you sure you want to delete ALL courses? This will completely clear all courses from the LMS and Public Website.")) {
+      await deleteAllCourses();
+      setCourses([]);
+      setStatusBanner({
+        type: "warning",
+        message: "All courses have been deleted from the ecosystem."
       });
     }
   };
@@ -1163,6 +1200,29 @@ export default function App() {
               </div>
 
               <div style={{ display: "flex", gap: "10px" }}>
+                {courses.length > 0 && (
+                  <button
+                    onClick={handleDeleteAllCourses}
+                    style={{
+                      fontSize: "0.85rem",
+                      padding: "10px 16px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      background: "rgba(239, 68, 68, 0.12)",
+                      border: "1px solid rgba(239, 68, 68, 0.35)",
+                      color: "#f87171",
+                      borderRadius: "10px",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                      transition: "all 0.2s"
+                    }}
+                    title="Delete all courses from system"
+                  >
+                    <Trash2 size={16} />
+                    <span>Delete All Courses</span>
+                  </button>
+                )}
                 <button
                   onClick={handleOpenCreateCourseModal}
                   className="btn-primary"
@@ -1183,19 +1243,19 @@ export default function App() {
               </div>
 
               <div className="glass-panel" style={{ padding: "18px 22px" }}>
-                <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 600, marginBottom: "6px" }}>IT & Computer Tracks</div>
+                <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 600, marginBottom: "6px" }}>Curriculum Categories</div>
                 <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "#818cf8" }}>
-                  {courses.filter(c => c.category?.toLowerCase().includes("it") || c.category?.toLowerCase().includes("technology")).length}
+                  {availableCategories.length}
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "2px" }}>Software & AI Labs</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "2px" }}>Academic Disciplines</div>
               </div>
 
               <div className="glass-panel" style={{ padding: "18px 22px" }}>
-                <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 600, marginBottom: "6px" }}>Language & Fluency</div>
+                <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 600, marginBottom: "6px" }}>Syllabus Modules</div>
                 <div style={{ fontSize: "1.8rem", fontWeight: 800, color: "#34d399" }}>
-                  {courses.filter(c => c.category?.toLowerCase().includes("language") || c.category?.toLowerCase().includes("english")).length}
+                  {courses.reduce((acc, c) => acc + (c.modules?.length || 0), 0)}
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "2px" }}>Spoken & IELTS Courses</div>
+                <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginTop: "2px" }}>Total Hands-on Topics</div>
               </div>
 
               <div className="glass-panel" style={{ padding: "18px 22px" }}>
@@ -1208,28 +1268,39 @@ export default function App() {
             {/* Filter & Search Bar */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "14px", marginBottom: "20px", flexWrap: "wrap" }}>
               <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {[
-                  { id: "all", label: "All Curricula" },
-                  { id: "Information Technology", label: "IT & Software" },
-                  { id: "Language & Fluency", label: "Language & IELTS" },
-                  { id: "Professional & Management", label: "Professional" }
-                ].map(cat => (
+                <button
+                  onClick={() => setFilterCourseCategory("all")}
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: "8px",
+                    border: filterCourseCategory === "all" ? "1px solid #6366f1" : "1px solid var(--border-subtle)",
+                    background: filterCourseCategory === "all" ? "rgba(99, 102, 241, 0.2)" : "rgba(255, 255, 255, 0.03)",
+                    color: filterCourseCategory === "all" ? "#ffffff" : "var(--text-muted)",
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    transition: "all 0.2s"
+                  }}
+                >
+                  All Curricula ({courses.length})
+                </button>
+                {availableCategories.map(cat => (
                   <button
-                    key={cat.id}
-                    onClick={() => setFilterCourseCategory(cat.id)}
+                    key={cat}
+                    onClick={() => setFilterCourseCategory(cat)}
                     style={{
                       padding: "7px 14px",
                       borderRadius: "8px",
-                      border: filterCourseCategory === cat.id ? "1px solid #6366f1" : "1px solid var(--border-subtle)",
-                      background: filterCourseCategory === cat.id ? "rgba(99, 102, 241, 0.2)" : "rgba(255, 255, 255, 0.03)",
-                      color: filterCourseCategory === cat.id ? "#ffffff" : "var(--text-muted)",
+                      border: filterCourseCategory === cat ? "1px solid #6366f1" : "1px solid var(--border-subtle)",
+                      background: filterCourseCategory === cat ? "rgba(99, 102, 241, 0.2)" : "rgba(255, 255, 255, 0.03)",
+                      color: filterCourseCategory === cat ? "#ffffff" : "var(--text-muted)",
                       fontSize: "0.82rem",
                       fontWeight: 600,
                       cursor: "pointer",
                       transition: "all 0.2s"
                     }}
                   >
-                    {cat.label}
+                    {cat} ({courses.filter(c => c.category === cat).length})
                   </button>
                 ))}
               </div>
@@ -2657,17 +2728,66 @@ export default function App() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Category *</label>
-                  <select
-                    value={courseForm.category}
-                    onChange={(e) => setCourseForm({ ...courseForm, category: e.target.value })}
-                    style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
-                  >
-                    <option value="Information Technology">Information Technology</option>
-                    <option value="Language & Fluency">Language & Fluency</option>
-                    <option value="Professional & Management">Professional & Management</option>
-                    <option value="Creative Arts & Design">Creative Arts & Design</option>
-                  </select>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                    <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600 }}>Category *</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomCategory(!isCustomCategory);
+                        if (!isCustomCategory) {
+                          setCustomCategoryInput("");
+                        }
+                      }}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#818cf8",
+                        fontSize: "0.75rem",
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        padding: 0
+                      }}
+                    >
+                      {isCustomCategory ? "← Pick from List" : "+ Type Custom Category"}
+                    </button>
+                  </div>
+
+                  {isCustomCategory ? (
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Artificial Intelligence, Digital Marketing..."
+                      value={customCategoryInput}
+                      onChange={(e) => setCustomCategoryInput(e.target.value)}
+                      style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid #6366f1", borderRadius: "8px", color: "#ffffff" }}
+                      autoFocus
+                    />
+                  ) : (
+                    <select
+                      required
+                      value={courseForm.category}
+                      onChange={(e) => {
+                        if (e.target.value === "__NEW_CUSTOM__") {
+                          setIsCustomCategory(true);
+                          setCustomCategoryInput("");
+                        } else {
+                          setCourseForm({ ...courseForm, category: e.target.value });
+                        }
+                      }}
+                      style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                    >
+                      <option value="" disabled>-- Select a Category --</option>
+                      {availableCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      {["Information Technology", "Language & Fluency", "Professional & Management", "Creative Arts & Design"]
+                        .filter(cat => !availableCategories.includes(cat))
+                        .map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      <option value="__NEW_CUSTOM__">+ Enter New / Custom Category...</option>
+                    </select>
+                  )}
                 </div>
 
                 <div>
@@ -3114,9 +3234,13 @@ export default function App() {
                     onChange={(e) => setNewExamForm({ ...newExamForm, courseId: e.target.value })}
                     style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
                   >
-                    {courses.map(c => (
-                      <option key={c.id} value={c.id}>{c.title}</option>
-                    ))}
+                    {courses.length === 0 ? (
+                      <option value="" disabled>No courses available (Add a course first)</option>
+                    ) : (
+                      courses.map(c => (
+                        <option key={c.id} value={c.id}>{c.title}</option>
+                      ))
+                    )}
                   </select>
                 </div>
 
@@ -3601,9 +3725,13 @@ export default function App() {
                   onChange={(e) => setNewBatch({ ...newBatch, courseId: e.target.value })}
                   style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
                 >
-                  {courses.map(c => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
-                  ))}
+                  {courses.length === 0 ? (
+                    <option value="" disabled>No courses available (Add a course first)</option>
+                  ) : (
+                    courses.map(c => (
+                      <option key={c.id} value={c.id}>{c.title}</option>
+                    ))
+                  )}
                 </select>
               </div>
 

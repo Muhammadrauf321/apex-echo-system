@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import EcosystemNav, { getAppUrl } from "@shared/EcosystemNav.jsx";
-import { getCourses, submitInquiry, verifyCertificate } from "@shared/dataStore.js";
+import { getCourses, subscribeToCourses, submitInquiry, verifyCertificate } from "@shared/dataStore.js";
 import { COURSE_CATEGORIES, BATCH_SLOTS } from "@shared/constants.js";
 import { 
   Code2, 
@@ -30,11 +30,10 @@ export default function App() {
   const [selectedCourseModal, setSelectedCourseModal] = useState(null);
 
   useEffect(() => {
-    const handleCoursesChanged = (e) => {
-      setCourses(e.detail || getCourses());
-    };
-    window.addEventListener("apex_courses_changed", handleCoursesChanged);
-    return () => window.removeEventListener("apex_courses_changed", handleCoursesChanged);
+    const unsubscribe = subscribeToCourses((liveCourses) => {
+      setCourses(liveCourses);
+    });
+    return () => unsubscribe();
   }, []);
 
   // Form State
@@ -53,6 +52,8 @@ export default function App() {
   const [certQuery, setCertQuery] = useState("");
   const [certResult, setCertResult] = useState(null);
   const [certSearched, setCertSearched] = useState(false);
+
+  const availableCategories = Array.from(new Set(courses.map(c => c.category).filter(Boolean)));
 
   const filteredCourses = activeTab === "all" 
     ? courses 
@@ -196,7 +197,9 @@ export default function App() {
             borderRadius: "12px",
             padding: "6px",
             gap: "8px",
-            marginTop: "28px"
+            marginTop: "28px",
+            flexWrap: "wrap",
+            justifyContent: "center"
           }}>
             <button
               onClick={() => setActiveTab("all")}
@@ -211,56 +214,64 @@ export default function App() {
                 transition: "all 0.2s"
               }}
             >
-              All Courses ({courses.length})
+              All Programs ({courses.length})
             </button>
-            <button
-              onClick={() => setActiveTab(COURSE_CATEGORIES.IT)}
-              style={{
-                padding: "8px 20px",
-                borderRadius: "8px",
-                border: "none",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                background: activeTab === COURSE_CATEGORIES.IT ? "var(--primary)" : "transparent",
-                color: activeTab === COURSE_CATEGORIES.IT ? "#ffffff" : "var(--text-muted)",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              <Code2 size={16} />
-              <span>💻 IT & Computer Sector</span>
-            </button>
-            <button
-              onClick={() => setActiveTab(COURSE_CATEGORIES.LANGUAGE)}
-              style={{
-                padding: "8px 20px",
-                borderRadius: "8px",
-                border: "none",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                background: activeTab === COURSE_CATEGORIES.LANGUAGE ? "var(--primary)" : "transparent",
-                color: activeTab === COURSE_CATEGORIES.LANGUAGE ? "#ffffff" : "var(--text-muted)",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.2s"
-              }}
-            >
-              <Languages size={16} />
-              <span>🗣️ Language Programs</span>
-            </button>
+            {availableCategories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setActiveTab(cat)}
+                style={{
+                  padding: "8px 20px",
+                  borderRadius: "8px",
+                  border: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  background: activeTab === cat ? "var(--primary)" : "transparent",
+                  color: activeTab === cat ? "#ffffff" : "var(--text-muted)",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s"
+                }}
+              >
+                <span>{cat}</span>
+                <span style={{ fontSize: "0.78rem", opacity: 0.75 }}>
+                  ({courses.filter(c => c.category === cat).length})
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Course Cards Grid */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))",
+          gridTemplateColumns: filteredCourses.length === 0 ? "1fr" : "repeat(auto-fill, minmax(350px, 1fr))",
           gap: "28px"
         }}>
-          {filteredCourses.map((course) => {
+          {filteredCourses.length === 0 ? (
+            <div style={{
+              textAlign: "center",
+              padding: "70px 20px",
+              background: "rgba(255, 255, 255, 0.02)",
+              border: "1px dashed var(--border-subtle)",
+              borderRadius: "16px",
+              maxWidth: "600px",
+              margin: "0 auto",
+              width: "100%"
+            }}>
+              <BookOpen size={44} color="#818cf8" style={{ margin: "0 auto 16px", opacity: 0.8 }} />
+              <h3 style={{ fontSize: "1.35rem", fontWeight: 800, color: "#ffffff", marginBottom: "8px" }}>
+                {courses.length === 0 ? "No Courses Published Yet" : `No Courses under "${activeTab}"`}
+              </h3>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.92rem", lineHeight: 1.6, margin: 0 }}>
+                {courses.length === 0 
+                  ? "Courses added, managed, or published by administrators in the Management LMS will automatically appear here in real-time."
+                  : "Switch to 'All Programs' to view other available training tracks."}
+              </p>
+            </div>
+          ) : (
+            filteredCourses.map((course) => {
             const isIT = course.category === COURSE_CATEGORIES.IT;
             return (
               <div 
@@ -358,7 +369,8 @@ export default function App() {
                 </div>
               </div>
             );
-          })}
+          })
+          )}
         </div>
       </section>
 
@@ -536,9 +548,13 @@ export default function App() {
                         fontSize: "0.95rem"
                       }}
                     >
-                      {courses.map(c => (
-                        <option key={c.id} value={c.id}>{c.title} ({c.duration})</option>
-                      ))}
+                      {courses.length === 0 ? (
+                        <option value="" disabled>No courses currently open for admissions</option>
+                      ) : (
+                        courses.map(c => (
+                          <option key={c.id} value={c.id}>{c.title} ({c.duration})</option>
+                        ))
+                      )}
                     </select>
                   </div>
 

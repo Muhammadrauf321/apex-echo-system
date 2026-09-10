@@ -1,6 +1,8 @@
 import { 
   collection, 
-  addDoc, 
+  doc,
+  setDoc,
+  deleteDoc,
   getDocs, 
   onSnapshot, 
   query, 
@@ -58,9 +60,14 @@ function initLocalData() {
     localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify({}));
   }
 
-  if (!localStorage.getItem(STORAGE_KEYS.COURSES)) {
-    localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(SEED_COURSES));
+  // Pure zero-mock course store: never inject seed courses if initialized
+  if (!localStorage.getItem("apex_courses_initialized")) {
+    if (!localStorage.getItem(STORAGE_KEYS.COURSES)) {
+      localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify([]));
+    }
+    localStorage.setItem("apex_courses_initialized", "true");
   }
+
   if (!localStorage.getItem(STORAGE_KEYS.BATCHES)) {
     localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify([]));
   }
@@ -86,13 +93,68 @@ initLocalData();
 // --- Courses ---
 export function getCourses() {
   if (typeof window === "undefined" || typeof localStorage === "undefined") {
-    return SEED_COURSES;
+    return [];
   }
   const data = localStorage.getItem(STORAGE_KEYS.COURSES);
-  return data ? JSON.parse(data) : SEED_COURSES;
+  if (data !== null) {
+    try {
+      return JSON.parse(data);
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
 }
 
-export function addCourse(courseData) {
+// Real-time Firestore courses subscription (Syncs Management LMS & Public Website across devices)
+export function subscribeToCourses(callback) {
+  if (typeof window === "undefined") return () => {};
+
+  // 1. Immediately emit current local cache
+  callback(getCourses());
+
+  // 2. Real-time Firestore snapshot listener
+  let unsubscribeFirestore = () => {};
+  try {
+    const colRef = collection(db, "courses");
+    unsubscribeFirestore = onSnapshot(colRef, (snapshot) => {
+      const liveCourses = [];
+      snapshot.forEach(docSnap => {
+        liveCourses.push({ id: docSnap.id, ...docSnap.data() });
+      });
+
+      // Sort by createdAt descending
+      liveCourses.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+      // Save to local cache & mark initialized
+      localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(liveCourses));
+      localStorage.setItem("apex_courses_initialized", "true");
+
+      // Notify callback & dispatch window event
+      callback(liveCourses);
+      window.dispatchEvent(new CustomEvent("apex_courses_changed", { detail: liveCourses }));
+    }, (err) => {
+      console.warn("Firestore courses subscription notice:", err);
+    });
+  } catch (e) {
+    console.warn("Firestore connection error:", e);
+  }
+
+  // 3. Local custom event listener fallback
+  const handleLocalChange = (e) => {
+    if (e.detail) {
+      callback(e.detail);
+    }
+  };
+  window.addEventListener("apex_courses_changed", handleLocalChange);
+
+  return () => {
+    unsubscribeFirestore();
+    window.removeEventListener("apex_courses_changed", handleLocalChange);
+  };
+}
+
+export async function addCourse(courseData) {
   const courses = getCourses();
   const slugId = courseData.title
     ? courseData.title.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")
@@ -101,11 +163,11 @@ export function addCourse(courseData) {
   
   const newCourse = {
     id: courseId,
-    title: courseData.title || "Untitled Course",
-    category: courseData.category || "Information Technology",
-    tagline: courseData.tagline || "",
-    duration: courseData.duration || "3 Months (12 Weeks)",
-    sessionsPerWeek: courseData.sessionsPerWeek || "4 Days / Week",
+    title: (courseData.title || "Untitled Course").trim(),
+    category: (courseData.category || "General Studies").trim(),
+    tagline: (courseData.tagline || "").trim(),
+    duration: (courseData.duration || "3 Months (12 Weeks)").trim(),
+    sessionsPerWeek: (courseData.sessionsPerWeek || "4 Days / Week").trim(),
     fee: Number(courseData.fee) || 20000,
     installments: Number(courseData.installments) || 2,
     level: courseData.level || "Beginner to Advanced",
@@ -124,33 +186,84 @@ export function addCourse(courseData) {
     createdAt: new Date().toISOString()
   };
 
-  const updated = [newCourse, ...courses];
+  const updated = [newCourse, ...courses.filter(c => c.id !== courseId)];
   localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(updated));
+  localStorage.setItem("apex_courses_initialized", "true");
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("apex_courses_changed", { detail: updated }));
   }
+
+  // Sync to Cloud Firestore
+  try {
+    await setDoc(doc(db, "courses", courseId), newCourse);
+  } catch (fsErr) {
+    console.warn("Firestore addCourse sync notice:", fsErr);
+  }
+
   return newCourse;
 }
 
-export function updateCourse(id, updatedFields) {
+export async function updateCourse(id, updatedFields) {
   const courses = getCourses();
   const updated = courses.map(c => c.id === id ? { ...c, ...updatedFields } : c);
   localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(updated));
+  localStorage.setItem("apex_courses_initialized", "true");
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("apex_courses_changed", { detail: updated }));
   }
+
+  // Sync to Cloud Firestore
+  try {
+    await setDoc(doc(db, "courses", id), updatedFields, { merge: true });
+  } catch (fsErr) {
+    console.warn("Firestore updateCourse sync notice:", fsErr);
+  }
+
   return updated;
 }
 
-export function deleteCourse(id) {
+export async function deleteCourse(id) {
   const courses = getCourses();
   const updated = courses.filter(c => c.id !== id);
   localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify(updated));
+  localStorage.setItem("apex_courses_initialized", "true");
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("apex_courses_changed", { detail: updated }));
   }
+
+  // Delete from Cloud Firestore
+  try {
+    await deleteDoc(doc(db, "courses", id));
+  } catch (fsErr) {
+    console.warn("Firestore deleteCourse sync notice:", fsErr);
+  }
+
   return updated;
 }
+
+export async function deleteAllCourses() {
+  localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify([]));
+  localStorage.setItem("apex_courses_initialized", "true");
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("apex_courses_changed", { detail: [] }));
+  }
+
+  // Delete all from Cloud Firestore
+  try {
+    const colRef = collection(db, "courses");
+    const snapshot = await getDocs(colRef);
+    const deletePromises = [];
+    snapshot.forEach((docSnap) => {
+      deletePromises.push(deleteDoc(doc(db, "courses", docSnap.id)));
+    });
+    await Promise.all(deletePromises);
+  } catch (fsErr) {
+    console.warn("Firestore deleteAllCourses sync notice:", fsErr);
+  }
+
+  return [];
+}
+
 
 // --- Teachers / Faculty Management (Registered by Admin) ---
 export function getTeachers() {
