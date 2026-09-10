@@ -267,21 +267,118 @@ export async function deleteAllCourses() {
 
 // --- Teachers / Faculty Management (Registered by Admin) ---
 export function getTeachers() {
+  if (typeof window === "undefined" || typeof localStorage === "undefined") return [];
   const data = localStorage.getItem(STORAGE_KEYS.TEACHERS);
-  return data ? JSON.parse(data) : [];
+  let teachers = data ? JSON.parse(data) : [];
+
+  // Cross-check with invitations & registered accounts:
+  // If any teacher has an activated invitation or registered account, make sure their status reflects "active"
+  try {
+    const invData = localStorage.getItem("apex_account_invitations");
+    const invitations = invData ? JSON.parse(invData) : [];
+    const accountsData = localStorage.getItem("apex_accounts");
+    const accounts = accountsData ? JSON.parse(accountsData) : [];
+
+    let modified = false;
+    teachers = teachers.map(t => {
+      const cleanEmail = t.email?.trim().toLowerCase();
+      const isInvActivated = invitations.some(i => i.email?.trim().toLowerCase() === cleanEmail && i.status === "activated");
+      const isAccountActive = accounts.some(a => a.email?.trim().toLowerCase() === cleanEmail && a.status === "active");
+      
+      if (t.status === "pending_activation" && (isInvActivated || isAccountActive)) {
+        modified = true;
+        return { ...t, status: "active", activatedAt: t.activatedAt || new Date().toISOString() };
+      }
+      return t;
+    });
+
+    if (modified) {
+      localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(teachers));
+    }
+  } catch (e) {
+    // Graceful fallback
+  }
+
+  return teachers;
 }
 
-export function addTeacher(teacherData) {
+// Real-time Cloud Firestore subscription for Teachers
+export function subscribeToTeachers(callback) {
+  if (typeof window === "undefined") return () => {};
+
+  // 1. Immediately emit current local state
+  callback(getTeachers());
+
+  // 2. Real-time Firestore snapshot listener
+  let unsubscribeFirestore = () => {};
+  try {
+    const colRef = collection(db, "teachers");
+    unsubscribeFirestore = onSnapshot(colRef, (snapshot) => {
+      const liveTeachers = [];
+      snapshot.forEach(docSnap => {
+        liveTeachers.push({ id: docSnap.id, ...docSnap.data() });
+      });
+
+      if (liveTeachers.length > 0) {
+        // Merge with local cache
+        const local = getTeachers();
+        const mergedMap = new Map();
+        local.forEach(t => mergedMap.set(t.email?.toLowerCase(), t));
+        liveTeachers.forEach(t => {
+          const key = t.email?.toLowerCase();
+          if (mergedMap.has(key)) {
+            const current = mergedMap.get(key);
+            mergedMap.set(key, {
+              ...current,
+              ...t,
+              status: (t.status === "active" || current.status === "active") ? "active" : t.status
+            });
+          } else {
+            mergedMap.set(key, t);
+          }
+        });
+
+        const merged = Array.from(mergedMap.values());
+        localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(merged));
+        callback(merged);
+        window.dispatchEvent(new CustomEvent("apex_teachers_changed", { detail: merged }));
+      }
+    }, (err) => {
+      console.warn("Firestore teachers subscription notice:", err);
+    });
+  } catch (e) {
+    console.warn("Firestore connection error:", e);
+  }
+
+  // 3. Local custom event listener
+  const handleLocalChange = (e) => {
+    if (e.detail) {
+      callback(e.detail);
+    } else {
+      callback(getTeachers());
+    }
+  };
+  window.addEventListener("apex_teachers_changed", handleLocalChange);
+
+  return () => {
+    unsubscribeFirestore();
+    window.removeEventListener("apex_teachers_changed", handleLocalChange);
+  };
+}
+
+export async function addTeacher(teacherData) {
   const teachers = getTeachers();
-  const existing = teachers.find(t => t.email.toLowerCase() === teacherData.email.toLowerCase());
+  const cleanEmail = (teacherData.email || "").trim().toLowerCase();
+  const existing = teachers.find(t => t.email?.trim().toLowerCase() === cleanEmail);
   if (existing) {
     return existing;
   }
+  const teacherId = `tch_${Date.now()}`;
   const newTeacher = {
-    id: `tch_${Date.now()}`,
-    name: teacherData.name,
-    email: teacherData.email,
-    department: teacherData.department || "IT",
+    id: teacherId,
+    name: (teacherData.name || "").trim(),
+    email: cleanEmail,
+    department: teacherData.department || "IT & Web Development",
     phone: teacherData.phone || "",
     role: "instructor",
     status: teacherData.status || "pending_activation",
@@ -290,7 +387,77 @@ export function addTeacher(teacherData) {
   teachers.push(newTeacher);
   localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(teachers));
   window.dispatchEvent(new CustomEvent("apex_teachers_changed", { detail: teachers }));
+
+  // Save to Cloud Firestore
+  try {
+    await setDoc(doc(db, "teachers", teacherId), newTeacher);
+  } catch (err) {
+    console.warn("Firestore addTeacher sync notice:", err);
+  }
+
   return newTeacher;
+}
+
+export async function updateTeacherStatus(emailOrId, newStatus = "active") {
+  const teachers = getTeachers();
+  const cleanKey = (emailOrId || "").trim().toLowerCase();
+
+  let updatedTeacher = null;
+  const updated = teachers.map(t => {
+    if (t.id === emailOrId || t.email?.trim().toLowerCase() === cleanKey) {
+      updatedTeacher = { ...t, status: newStatus, activatedAt: new Date().toISOString() };
+      return updatedTeacher;
+    }
+    return t;
+  });
+
+  localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(updated));
+  window.dispatchEvent(new CustomEvent("apex_teachers_changed", { detail: updated }));
+
+  // Update in Cloud Firestore
+  try {
+    if (updatedTeacher?.id) {
+      await setDoc(doc(db, "teachers", updatedTeacher.id), updatedTeacher, { merge: true });
+    } else if (cleanKey) {
+      // Find doc in Firestore by email query
+      const colRef = collection(db, "teachers");
+      const snapshot = await getDocs(colRef);
+      snapshot.forEach(async (docSnap) => {
+        const d = docSnap.data();
+        if (d.email?.toLowerCase() === cleanKey) {
+          await setDoc(doc(db, "teachers", docSnap.id), { status: newStatus, activatedAt: new Date().toISOString() }, { merge: true });
+        }
+      });
+    }
+
+    // Also update any invitations matching email in Firestore & localStorage
+    if (cleanKey) {
+      const invData = localStorage.getItem("apex_account_invitations");
+      if (invData) {
+        const invs = JSON.parse(invData);
+        const updatedInvs = invs.map(i => i.email?.toLowerCase() === cleanKey ? { ...i, status: newStatus === "active" ? "activated" : i.status } : i);
+        localStorage.setItem("apex_account_invitations", JSON.stringify(updatedInvs));
+        window.dispatchEvent(new CustomEvent("apex_invitations_changed", { detail: updatedInvs }));
+      }
+
+      try {
+        const invCol = collection(db, "invitations");
+        const snapshot = await getDocs(invCol);
+        snapshot.forEach(async (docSnap) => {
+          const d = docSnap.data();
+          if (d.email?.toLowerCase() === cleanKey) {
+            await setDoc(doc(db, "invitations", docSnap.id), { status: newStatus === "active" ? "activated" : d.status, activatedAt: new Date().toISOString() }, { merge: true });
+          }
+        });
+      } catch (invErr) {
+        console.warn("Firestore invitations status sync notice:", invErr);
+      }
+    }
+  } catch (fsErr) {
+    console.warn("Firestore updateTeacherStatus notice:", fsErr);
+  }
+
+  return updated;
 }
 
 // --- Batches ---

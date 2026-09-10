@@ -22,7 +22,9 @@ import {
   approveExam,
   requestExamRevision,
   getTeachers,
+  subscribeToTeachers,
   addTeacher,
+  updateTeacherStatus,
   getStudents,
   saveStudents,
   enrollStudent
@@ -245,6 +247,10 @@ export default function App() {
       setCourses(liveCourses);
     });
 
+    const unsubTeachers = subscribeToTeachers((liveTeachers) => {
+      setTeachers(liveTeachers);
+    });
+
     const handleCourses = () => setCourses(getCourses());
     const handleInq = () => setInquiries(getInquiries());
     const handleBatches = () => setBatches(getBatches());
@@ -263,6 +269,7 @@ export default function App() {
 
     return () => {
       unsubCourses();
+      unsubTeachers();
       window.removeEventListener("apex_courses_changed", handleCourses);
       window.removeEventListener("apex_inquiries_changed", handleInq);
       window.removeEventListener("apex_batches_changed", handleBatches);
@@ -1822,8 +1829,14 @@ export default function App() {
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "16px" }}>
                 {teachers.map(t => {
-                  const isPending = t.status === "pending_activation";
-                  const inv = isPending ? getInvitationByEmail(t.email) : null;
+                  const inv = getInvitationByEmail(t.email);
+                  const isPending = t.status === "pending_activation" && inv?.status !== "activated";
+
+                  // Auto-heal in background if invitation was activated
+                  if (t.status === "pending_activation" && inv?.status === "activated") {
+                    updateTeacherStatus(t.id, "active");
+                  }
+
                   const originUrl = typeof window !== "undefined" ? window.location.origin : "";
                   const activationUrl = inv ? `${originUrl}/?activate=${inv.token}` : "";
                   const gmailComposeLink = inv ? generateGmailComposeUrl({
@@ -1839,7 +1852,7 @@ export default function App() {
                       <div>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "rgba(16, 185, 129, 0.2)", color: "#34d399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "1rem" }}>
+                            <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: isPending ? "rgba(245, 158, 11, 0.2)" : "rgba(16, 185, 129, 0.2)", color: isPending ? "#fbbf24" : "#34d399", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "1rem" }}>
                               {t.name[0]}
                             </div>
                             <div>
@@ -1850,7 +1863,7 @@ export default function App() {
 
                           <span style={{
                             fontSize: "0.7rem",
-                            padding: "2px 8px",
+                            padding: "3px 9px",
                             borderRadius: "6px",
                             fontWeight: 700,
                             background: isPending ? "rgba(245, 158, 11, 0.15)" : "rgba(16, 185, 129, 0.15)",
@@ -1867,20 +1880,49 @@ export default function App() {
                         </div>
                       </div>
 
-                      {isPending && (
+                      {isPending ? (
                         <div style={{ marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                           <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
-                            Security Code: <strong style={{ color: "#38bdf8" }}>{inv?.tempCode || "Generated"}</strong>
+                            Code: <strong style={{ color: "#38bdf8" }}>{inv?.tempCode || "Generated"}</strong>
                           </span>
-                          <button
-                            onClick={() => handleResendInvite(t.email, t.name, "instructor")}
-                            className="btn-secondary"
-                            style={{ padding: "5px 12px", fontSize: "0.74rem", display: "inline-flex", alignItems: "center", gap: "5px", color: "#38bdf8" }}
-                            title="Resend Activation Email automatically via Firebase"
-                          >
-                            <RefreshCw size={12} />
-                            <span>Resend Activation Email</span>
-                          </button>
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                            <button
+                              onClick={async () => {
+                                await updateTeacherStatus(t.id, "active");
+                                setTeachers(getTeachers());
+                                setStatusBanner({
+                                  type: "success",
+                                  message: `Faculty member "${t.name}" is now marked Active & verified!`
+                                });
+                              }}
+                              className="btn-secondary"
+                              style={{ padding: "4px 10px", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#34d399", borderColor: "rgba(16, 185, 129, 0.4)", background: "rgba(16, 185, 129, 0.1)" }}
+                              title="Mark instructor as active immediately"
+                            >
+                              <CheckCircle2 size={12} />
+                              <span>Mark Active</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleResendInvite(t.email, t.name, "instructor")}
+                              className="btn-secondary"
+                              style={{ padding: "4px 10px", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#38bdf8" }}
+                              title="Resend Activation Email automatically via Firebase"
+                            >
+                              <RefreshCw size={12} />
+                              <span>Resend Email</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "0.75rem", color: "#34d399", fontWeight: 600 }}>
+                            <CheckCircle2 size={14} />
+                            <span>Account Activated & Verified</span>
+                          </div>
+                          <span style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>
+                            Authorized Faculty
+                          </span>
                         </div>
                       )}
                     </div>

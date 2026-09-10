@@ -8,10 +8,11 @@ import {
   GoogleAuthProvider,
   signInWithPopup
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
 import { sendActivationEmail, generateGmailComposeUrl } from "./emailService.js";
 import { sendFirebaseActivationEmail } from "./firebaseEmailService.js";
 import { ROLES } from "./constants.js";
+import { updateTeacherStatus } from "./dataStore.js";
 
 const CURRENT_USER_KEY = "apex_current_user";
 const ACCOUNTS_KEY = "apex_registered_accounts";
@@ -328,8 +329,14 @@ export async function createAccountInvitation({ name, email, role, department = 
   const updatedInvitations = existingPending
     ? invitations.map(i => i.id === invitation.id ? invitation : i)
     : [invitation, ...invitations];
-
   saveInvitations(updatedInvitations);
+
+  // Sync invitation to Cloud Firestore for cross-browser / cross-device resolution
+  try {
+    await setDoc(doc(db, "invitations", invitation.id), invitation, { merge: true });
+  } catch (fsErr) {
+    console.warn("Firestore invitation sync notice:", fsErr);
+  }
 
   // Construct official Apex Dispatch Email
   const roleName = role === "instructor" ? "Teaching Faculty" : "Student";
@@ -474,6 +481,12 @@ export async function activateAccountWithPassword({ token, email, tempCode, perm
   const updatedInv = invitations.map(i => i.id === invitation.id ? { ...i, status: "activated", activatedAt: new Date().toISOString() } : i);
   saveInvitations(updatedInv);
 
+  try {
+    await setDoc(doc(db, "invitations", invitation.id), { status: "activated", activatedAt: new Date().toISOString() }, { merge: true });
+  } catch (fsErr) {
+    console.warn("Firestore invitation activated update notice:", fsErr);
+  }
+
   // 2. Register active account
   const newAccount = {
     uid: `usr_${Date.now()}`,
@@ -495,25 +508,15 @@ export async function activateAccountWithPassword({ token, email, tempCode, perm
 
   saveRegisteredAccount(newAccount);
 
-  // Sync teacher and student status in apex_teachers and apex_students
+  // Sync teacher and student status in dataStore & Firestore
   try {
-    const teachersRaw = safeStorage.getItem("apex_teachers");
-    if (teachersRaw) {
-      const teachers = JSON.parse(teachersRaw);
-      const updatedTeachers = teachers.map(t => 
-        t.email && t.email.toLowerCase() === invitation.email.toLowerCase() ? { ...t, status: "active" } : t
-      );
-      safeStorage.setItem("apex_teachers", JSON.stringify(updatedTeachers));
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("apex_teachers_changed", { detail: updatedTeachers }));
-      }
-    }
+    await updateTeacherStatus(invitation.email, "active");
 
     const studentsRaw = safeStorage.getItem("apex_students");
     if (studentsRaw) {
       const students = JSON.parse(studentsRaw);
       const updatedStudents = students.map(s => 
-        s.email && s.email.toLowerCase() === invitation.email.toLowerCase() ? { ...s, status: "active" } : s
+        s.email && s.email.toLowerCase() === invitation.email.toLowerCase() ? { ...s, status: "active", activationStatus: "active" } : s
       );
       safeStorage.setItem("apex_students", JSON.stringify(updatedStudents));
       if (typeof window !== "undefined") {
@@ -597,6 +600,7 @@ export async function loginWithEmail(email, password) {
 
   if (matchedAccount) {
     if (matchedAccount.password === cleanPass || cleanPass === "password123") {
+      updateTeacherStatus(cleanEmail, "active");
       setCurrentUser(matchedAccount);
       return { success: true, user: matchedAccount };
     } else {
@@ -607,6 +611,7 @@ export async function loginWithEmail(email, password) {
   // 3. Check Admin fallback with password check
   if (cleanEmail === "muhammadraufbaloch6@gmail.com" || cleanEmail === ADMIN_USER.email.toLowerCase()) {
     if (cleanPass === "password123" || cleanPass === "admin123" || cleanPass === "rauf123") {
+      updateTeacherStatus(cleanEmail, "active");
       setCurrentUser(ADMIN_USER);
       return { success: true, user: ADMIN_USER };
     }
@@ -615,6 +620,7 @@ export async function loginWithEmail(email, password) {
   // 4. Try live Firebase Auth
   try {
     const cred = await signInWithEmailAndPassword(auth, cleanEmail, cleanPass);
+    updateTeacherStatus(cleanEmail, "active");
     const userDocRef = doc(db, "users", cred.user.uid);
     const userSnap = await getDoc(userDocRef);
     let profile = {
@@ -679,6 +685,11 @@ export async function loginWithGoogle() {
       // Auto-activate the invitation
       const updatedInvs = invitations.map(i => i.id === pendingInv.id ? { ...i, status: "activated", activatedAt: new Date().toISOString() } : i);
       saveInvitations(updatedInvs);
+      try {
+        await setDoc(doc(db, "invitations", pendingInv.id), { status: "activated", activatedAt: new Date().toISOString() }, { merge: true });
+      } catch (fsErr) {
+        console.warn("Firestore invitation auto-activate warning:", fsErr);
+      }
     } else {
       // Check existing accounts
       const accounts = getRegisteredAccounts();
@@ -715,6 +726,13 @@ export async function loginWithGoogle() {
     const accounts = getRegisteredAccounts();
     const filtered = accounts.filter(a => a.email.toLowerCase() !== cleanEmail);
     saveRegisteredAccounts([userData, ...filtered]);
+
+    // Ensure teacher status is marked active in teachers collection & dataStore
+    try {
+      await updateTeacherStatus(cleanEmail, "active");
+    } catch (tErr) {
+      console.warn("Teacher status activation warning:", tErr);
+    }
 
     setCurrentUser(userData);
     return { success: true, user: userData };
