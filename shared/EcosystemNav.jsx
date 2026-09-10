@@ -8,6 +8,7 @@ import {
   loginWithGoogle,
   getInvitationByToken,
   getInvitationByCodeAndEmail,
+  resolveAndActivateInvitationByTokenOrEmail,
   activateAccountWithPassword,
   getDispatchedEmails,
   saveDispatchedEmails
@@ -114,11 +115,12 @@ export default function EcosystemNav({ currentApp = "website" }) {
     };
     window.addEventListener("apex_open_login", handleOpenLogin);
 
-    // Check URL query parameters for ?activate=TOKEN
+    // Check URL query parameters for ?activate=TOKEN or ?email=...
     const params = new URLSearchParams(window.location.search);
     const token = params.get("activate");
-    if (token) {
-      handleOpenActivationByToken(token);
+    const emailParam = params.get("email");
+    if (token || emailParam) {
+      handleOpenActivationByToken(token, emailParam);
     }
 
     // Listen for dispatched emails
@@ -234,19 +236,49 @@ export default function EcosystemNav({ currentApp = "website" }) {
     }
   }, [activeToastEmail]);
 
-  // Open activation by token
-  const handleOpenActivationByToken = (token) => {
-    const inv = getInvitationByToken(token);
-    if (inv) {
-      setTargetInvitation(inv);
-      setActivateToken(token);
-      setActivateEmail(inv.email);
-      setActivateTempCode(inv.tempCode);
-      setActivateError("");
-      setShowActivateModal(true);
-    } else {
-      setActivateError("Activation link is invalid or has expired.");
-      setShowActivateModal(true);
+  // Open activation by token or email, auto-marking as active in Firestore immediately!
+  const handleOpenActivationByToken = async (token, emailParam = null) => {
+    setIsActivating(true);
+    try {
+      const inv = await resolveAndActivateInvitationByTokenOrEmail(token, emailParam);
+      if (inv) {
+        setTargetInvitation(inv);
+        setActivateToken(inv.token || token || "");
+        setActivateEmail(inv.email || emailParam || "");
+        setActivateTempCode(inv.tempCode || "");
+        setActivateError("");
+        setShowActivateModal(true);
+        confetti({ particleCount: 75, spread: 60, origin: { y: 0.5 } });
+      } else {
+        const localInv = getInvitationByToken(token);
+        if (localInv) {
+          setTargetInvitation(localInv);
+          setActivateToken(token);
+          setActivateEmail(localInv.email);
+          setActivateTempCode(localInv.tempCode);
+          setActivateError("");
+          setShowActivateModal(true);
+        } else {
+          setActivateError("Activation link is invalid or has expired.");
+          setShowActivateModal(true);
+        }
+      }
+    } catch (err) {
+      console.warn("Auto-activation notice:", err);
+      const localInv = getInvitationByToken(token);
+      if (localInv) {
+        setTargetInvitation(localInv);
+        setActivateToken(token);
+        setActivateEmail(localInv.email);
+        setActivateTempCode(localInv.tempCode);
+        setActivateError("");
+        setShowActivateModal(true);
+      } else {
+        setActivateError("Activation link is invalid or has expired.");
+        setShowActivateModal(true);
+      }
+    } finally {
+      setIsActivating(false);
     }
   };
 

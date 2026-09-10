@@ -1678,7 +1678,7 @@ export default function App() {
                       const isPendingActivation = std.activationStatus === "pending_activation";
                       const inv = isPendingActivation ? getInvitationByEmail(std.email) : null;
                       const originUrl = typeof window !== "undefined" ? window.location.origin : "";
-                      const activationUrl = inv ? `${originUrl}/?activate=${inv.token}` : "";
+                      const activationUrl = inv ? `${originUrl}/?activate=${inv.token}&email=${encodeURIComponent(std.email)}` : "";
                       const gmailComposeLink = inv ? generateGmailComposeUrl({
                         recipientEmail: std.email,
                         recipientName: std.name,
@@ -1838,7 +1838,7 @@ export default function App() {
                   }
 
                   const originUrl = typeof window !== "undefined" ? window.location.origin : "";
-                  const activationUrl = inv ? `${originUrl}/?activate=${inv.token}` : "";
+                  const activationUrl = inv ? `${originUrl}/?activate=${inv.token}&email=${encodeURIComponent(t.email)}` : "";
                   const gmailComposeLink = inv ? generateGmailComposeUrl({
                     recipientEmail: t.email,
                     recipientName: t.name,

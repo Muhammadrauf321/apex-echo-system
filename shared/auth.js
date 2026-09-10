@@ -341,8 +341,8 @@ export async function createAccountInvitation({ name, email, role, department = 
   // Construct official Apex Dispatch Email
   const roleName = role === "instructor" ? "Teaching Faculty" : "Student";
   const activationUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/?activate=${token}`
-    : `https://apex-education-forum.web.app/?activate=${token}`;
+    ? `${window.location.origin}/?activate=${token}&email=${encodeURIComponent(cleanEmail)}`
+    : `https://apex-education-forum.web.app/?activate=${token}&email=${encodeURIComponent(cleanEmail)}`;
 
   const gmailComposeUrl = generateGmailComposeUrl({
     recipientEmail: cleanEmail,
@@ -454,6 +454,84 @@ export function getInvitationByCodeAndEmail(code, email) {
   return invitations.find(i => i.email.toLowerCase() === cleanEmail && i.tempCode.toUpperCase() === cleanCode) || null;
 }
 
+// Automatically resolve and activate invitation the second the faculty/student clicks the link
+export async function resolveAndActivateInvitationByTokenOrEmail(token, emailHint = null) {
+  let invitation = null;
+  const cleanToken = (token || "").trim();
+  const cleanEmail = (emailHint || "").trim().toLowerCase();
+
+  // 1. Try local storage first
+  const localInvs = getInvitations();
+  if (cleanToken) {
+    invitation = localInvs.find(i => i.token === cleanToken || i.tempCode === cleanToken);
+  }
+  if (!invitation && cleanEmail) {
+    invitation = localInvs.find(i => i.email?.toLowerCase() === cleanEmail);
+  }
+
+  // 2. Query Cloud Firestore if not found in local storage
+  if (!invitation) {
+    try {
+      const colRef = collection(db, "invitations");
+      const snap = await getDocs(colRef);
+      snap.forEach(docSnap => {
+        const d = { id: docSnap.id, ...docSnap.data() };
+        if (cleanToken && (d.token === cleanToken || d.tempCode === cleanToken)) {
+          invitation = d;
+        } else if (cleanEmail && d.email?.toLowerCase() === cleanEmail) {
+          invitation = d;
+        }
+      });
+    } catch (e) {
+      console.warn("Firestore invitation query notice:", e);
+    }
+  }
+
+  // 3. Auto-activate invitation & teacher status immediately upon link click!
+  if (invitation) {
+    const emailToActivate = invitation.email || cleanEmail;
+    
+    // Update local storage
+    const updatedInvs = localInvs.map(i => 
+      (i.id === invitation.id || (emailToActivate && i.email?.toLowerCase() === emailToActivate.toLowerCase()))
+        ? { ...i, status: "activated", clickedAt: new Date().toISOString(), activatedAt: new Date().toISOString() }
+        : i
+    );
+    if (!localInvs.some(i => i.id === invitation.id)) {
+      updatedInvs.unshift({ ...invitation, status: "activated", clickedAt: new Date().toISOString(), activatedAt: new Date().toISOString() });
+    }
+    saveInvitations(updatedInvs);
+
+    // Update Cloud Firestore invitation doc
+    try {
+      if (invitation.id) {
+        await setDoc(doc(db, "invitations", invitation.id), {
+          status: "activated",
+          clickedAt: new Date().toISOString(),
+          activatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+    } catch (fsErr) {
+      console.warn("Firestore update invitation status notice:", fsErr);
+    }
+
+    // Auto-update teacher status in Firestore & dataStore
+    if (emailToActivate) {
+      await updateTeacherStatus(emailToActivate, "active");
+    }
+
+    return { success: true, invitation: { ...invitation, status: "activated" } };
+  }
+
+  // Fallback: If we only have an emailHint, activate teacher directly
+  if (cleanEmail) {
+    await updateTeacherStatus(cleanEmail, "active");
+    return { success: true, invitation: { email: cleanEmail, status: "activated" } };
+  }
+
+  return { success: false, error: "Invitation not found or link expired." };
+}
+
 // Account Activation: User sets Permanent Password
 export async function activateAccountWithPassword({ token, email, tempCode, permanentPassword }) {
   if (!permanentPassword || permanentPassword.length < 6) {
@@ -467,8 +545,22 @@ export async function activateAccountWithPassword({ token, email, tempCode, perm
   if (!invitation && email && tempCode) {
     invitation = getInvitationByCodeAndEmail(tempCode, email);
   }
-
   if (!invitation) {
+    try {
+      const colRef = collection(db, "invitations");
+      const snap = await getDocs(colRef);
+      snap.forEach(docSnap => {
+        const d = { id: docSnap.id, ...docSnap.data() };
+        if (token && (d.token === token || d.tempCode === token)) {
+          invitation = d;
+        } else if (email && d.email?.toLowerCase() === email.trim().toLowerCase()) {
+          invitation = d;
+        }
+      });
+    } catch (e) {}
+  }
+
+  if (!invitation && !email) {
     return { success: false, error: "Invalid or expired activation link/code." };
   }
 
