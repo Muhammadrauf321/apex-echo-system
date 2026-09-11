@@ -131,9 +131,13 @@ export function saveRegisteredAccount(account) {
   safeStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
 }
 
-// Save accounts array
+// Save accounts array or single account
 export function saveRegisteredAccounts(accounts) {
-  safeStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+  if (Array.isArray(accounts)) {
+    safeStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+  } else if (accounts) {
+    saveRegisteredAccount(accounts);
+  }
 }
 
 // Current User management - strictly synced via cross-port cookie (ZERO AUTO-LOGIN)
@@ -808,9 +812,7 @@ export async function loginWithGoogle() {
     }
 
     // Register account locally
-    const accounts = getRegisteredAccounts();
-    const filtered = accounts.filter(a => a.email.toLowerCase() !== cleanEmail);
-    saveRegisteredAccounts([userData, ...filtered]);
+    saveRegisteredAccount(userData);
 
     // Ensure teacher status is marked active in teachers collection & dataStore
     try {
