@@ -11,7 +11,9 @@ import {
   resolveAndActivateInvitationByTokenOrEmail,
   activateAccountWithPassword,
   getDispatchedEmails,
-  saveDispatchedEmails
+  saveDispatchedEmails,
+  requestPasswordReset,
+  completePasswordReset
 } from "./auth.js";
 import { ROLES, ROLE_LABELS } from "./constants.js";
 import confetti from "canvas-confetti";
@@ -97,6 +99,24 @@ export default function EcosystemNav({ currentApp = "website" }) {
   const [activeToastEmail, setActiveToastEmail] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
 
+  // Forgot Password & Reset Password States
+  const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotMessage, setForgotMessage] = useState(null);
+  const [forgotError, setForgotError] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotGmailUrl, setForgotGmailUrl] = useState(null);
+
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [resetToken, setResetToken] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetTempCode, setResetTempCode] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resetSuccess, setResetSuccess] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
   // EmailJS Configuration State
   const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
   const [emailConfig, setEmailConfig] = useState(getEmailJSConfig());
@@ -119,7 +139,15 @@ export default function EcosystemNav({ currentApp = "website" }) {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("activate");
     const emailParam = params.get("email");
-    if (token || emailParam) {
+    const resetTokenParam = params.get("resetPassword") || params.get("reset");
+    const resetCodeParam = params.get("resetCode");
+
+    if (resetTokenParam || resetCodeParam) {
+      setResetToken(resetTokenParam || "");
+      setResetTempCode(resetCodeParam || "");
+      if (emailParam) setResetEmail(emailParam);
+      setShowResetPasswordModal(true);
+    } else if (token || emailParam) {
       handleOpenActivationByToken(token, emailParam);
     }
 
@@ -402,6 +430,72 @@ export default function EcosystemNav({ currentApp = "website" }) {
       }, 2000);
     } else {
       setActivateError(res.error || "Failed to activate account. Please check your token or temporary code.");
+    }
+  };
+
+  // Submit Forgot Password request
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setForgotError("");
+    setForgotMessage(null);
+    setForgotGmailUrl(null);
+    setForgotLoading(true);
+
+    const res = await requestPasswordReset(forgotEmail);
+    setForgotLoading(false);
+
+    if (res.success) {
+      setForgotMessage(res.message);
+      setForgotGmailUrl(res.gmailComposeUrl);
+      confetti({ particleCount: 70, spread: 60, origin: { y: 0.5 } });
+    } else {
+      setForgotError(res.error || "Failed to process password reset request.");
+    }
+  };
+
+  // Submit Password Reset
+  const handleResetPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setResetError("");
+
+    if (resetNewPassword !== resetConfirmPassword) {
+      setResetError("Passwords do not match. Please re-enter.");
+      return;
+    }
+    if (resetNewPassword.length < 6) {
+      setResetError("Password must be at least 6 characters long.");
+      return;
+    }
+
+    setResetLoading(true);
+    const res = await completePasswordReset({
+      token: resetToken,
+      tempCode: resetTempCode,
+      email: resetEmail,
+      newPassword: resetNewPassword
+    });
+    setResetLoading(false);
+
+    if (res.success) {
+      setResetSuccess(true);
+      confetti({ particleCount: 150, spread: 90, origin: { y: 0.5 } });
+
+      // Clean up URL if ?resetPassword was present
+      if (window.history.replaceState && window.location.search.includes("reset")) {
+        const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({ path: cleanUrl }, "", cleanUrl);
+      }
+
+      setTimeout(() => {
+        setShowResetPasswordModal(false);
+        setResetSuccess(false);
+        setResetNewPassword("");
+        setResetConfirmPassword("");
+        setResetToken("");
+        setResetTempCode("");
+      }, 2000);
+    } else {
+      setResetError(res.error || "Failed to reset password. Please check your token or code.");
     }
   };
 
@@ -1225,9 +1319,33 @@ export default function EcosystemNav({ currentApp = "website" }) {
               </div>
 
               <div style={{ marginBottom: "20px" }}>
-                <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "6px", color: "#cbd5e1" }}>
-                  Password
-                </label>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <label style={{ fontSize: "0.82rem", fontWeight: 600, color: "#cbd5e1" }}>
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowLoginModal(false);
+                      setForgotEmail(loginEmail);
+                      setForgotError("");
+                      setForgotMessage(null);
+                      setForgotGmailUrl(null);
+                      setShowForgotPasswordModal(true);
+                    }}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "#38bdf8",
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      padding: 0
+                    }}
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
                 <input
                   type="password"
                   required
@@ -1326,6 +1444,291 @@ export default function EcosystemNav({ currentApp = "website" }) {
                 Activate ID with Security Code
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 4b. MODAL: FORGOT PASSWORD                                */}
+      {/* ======================================================== */}
+      {showForgotPasswordModal && renderPortal(
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: "100vw",
+          height: "100vh",
+          background: "rgba(3, 7, 18, 0.85)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 999999,
+          padding: "20px",
+          boxSizing: "border-box",
+          overflowY: "auto"
+        }}>
+          <div style={{
+            background: "#0b0f19",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: "18px",
+            width: "100%",
+            maxWidth: "430px",
+            padding: "28px",
+            boxShadow: "0 25px 60px rgba(0,0,0,0.9)",
+            maxHeight: "calc(100vh - 40px)",
+            overflowY: "auto",
+            margin: "auto",
+            position: "relative"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <div>
+                <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#ffffff" }}>
+                  Forgot Password?
+                </h3>
+                <p style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "4px" }}>
+                  پاسورڈ بھول گئے؟ Enter your registered email to receive a reset link.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowForgotPasswordModal(false)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {forgotError && (
+              <div style={{ padding: "10px 12px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "8px", color: "#f87171", fontSize: "0.82rem", marginBottom: "16px" }}>
+                {forgotError}
+              </div>
+            )}
+
+            {forgotMessage ? (
+              <div style={{ textAlign: "center", padding: "16px 0" }}>
+                <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+                  <CheckCircle2 size={26} color="#34d399" />
+                </div>
+                <h4 style={{ color: "#ffffff", fontSize: "1.05rem", fontWeight: 700, marginBottom: "8px" }}>
+                  Password Reset Initiated
+                </h4>
+                <p style={{ color: "#94a3b8", fontSize: "0.84rem", lineHeight: 1.5, marginBottom: "18px" }}>
+                  {forgotMessage}
+                </p>
+
+                {forgotGmailUrl && (
+                  <a
+                    href={forgotGmailUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      width: "100%",
+                      padding: "12px",
+                      background: "rgba(239, 68, 68, 0.15)",
+                      border: "1px solid rgba(239, 68, 68, 0.4)",
+                      borderRadius: "10px",
+                      color: "#f87171",
+                      textDecoration: "none",
+                      fontWeight: 700,
+                      fontSize: "0.88rem",
+                      marginBottom: "12px",
+                      boxSizing: "border-box"
+                    }}
+                  >
+                    <Mail size={16} />
+                    <span>Open in Gmail Web (1-Click Send)</span>
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPasswordModal(false);
+                    setShowLoginModal(true);
+                  }}
+                  className="btn-secondary"
+                  style={{ width: "100%", padding: "10px", fontSize: "0.86rem" }}
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleForgotPasswordSubmit}>
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "6px", color: "#cbd5e1" }}>
+                    Registered Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="Enter your registered email"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    style={{ width: "100%", padding: "10px", background: "#060911", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="btn-primary"
+                  style={{ width: "100%", padding: "12px", fontWeight: 700 }}
+                >
+                  {forgotLoading ? "Processing Request..." : "Send Password Reset Link"}
+                </button>
+
+                <div style={{ marginTop: "16px", textAlign: "center" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPasswordModal(false);
+                      setShowLoginModal(true);
+                    }}
+                    style={{ background: "transparent", border: "none", color: "#94a3b8", fontSize: "0.82rem", cursor: "pointer" }}
+                  >
+                    Remembered password? <strong style={{ color: "#ffffff" }}>Sign In</strong>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* 4c. MODAL: SET NEW PASSWORD (RESET WORKFLOW)             */}
+      {/* ======================================================== */}
+      {showResetPasswordModal && renderPortal(
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: "100vw",
+          height: "100vh",
+          background: "rgba(3, 7, 18, 0.85)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 999999,
+          padding: "20px",
+          boxSizing: "border-box",
+          overflowY: "auto"
+        }}>
+          <div style={{
+            background: "#0b0f19",
+            border: "1px solid rgba(255, 255, 255, 0.12)",
+            borderRadius: "18px",
+            width: "100%",
+            maxWidth: "430px",
+            padding: "28px",
+            boxShadow: "0 25px 60px rgba(0,0,0,0.9)",
+            maxHeight: "calc(100vh - 40px)",
+            overflowY: "auto",
+            margin: "auto",
+            position: "relative"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+              <div>
+                <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#ffffff" }}>
+                  Set New Password
+                </h3>
+                <p style={{ fontSize: "0.8rem", color: "#94a3b8", marginTop: "4px" }}>
+                  Create a new secure password for your Apex account.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowResetPasswordModal(false)}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {resetError && (
+              <div style={{ padding: "10px 12px", background: "rgba(239, 68, 68, 0.15)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: "8px", color: "#f87171", fontSize: "0.82rem", marginBottom: "16px" }}>
+                {resetError}
+              </div>
+            )}
+
+            {resetSuccess ? (
+              <div style={{ textAlign: "center", padding: "20px 0" }}>
+                <div style={{ width: "52px", height: "52px", borderRadius: "50%", background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.4)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <CheckCircle2 size={30} color="#34d399" />
+                </div>
+                <h4 style={{ color: "#ffffff", fontSize: "1.1rem", fontWeight: 800, marginBottom: "8px" }}>
+                  Password Reset Successful!
+                </h4>
+                <p style={{ color: "#34d399", fontSize: "0.86rem", fontWeight: 600 }}>
+                  Logging you in automatically...
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleResetPasswordSubmit}>
+                <div style={{ marginBottom: "14px" }}>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "6px", color: "#cbd5e1" }}>
+                    Account Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    placeholder="e.g. name@gmail.com"
+                    style={{ width: "100%", padding: "10px", background: "#060911", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "14px" }}>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "6px", color: "#cbd5e1" }}>
+                    New Password * (Min 6 characters)
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={resetNewPassword}
+                    onChange={(e) => setResetNewPassword(e.target.value)}
+                    placeholder="Enter new strong password"
+                    style={{ width: "100%", padding: "10px", background: "#060911", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "22px" }}>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "6px", color: "#cbd5e1" }}>
+                    Confirm New Password *
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={resetConfirmPassword}
+                    onChange={(e) => setResetConfirmPassword(e.target.value)}
+                    placeholder="Re-enter new password"
+                    style={{ width: "100%", padding: "10px", background: "#060911", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={resetLoading}
+                  className="btn-primary"
+                  style={{ width: "100%", padding: "12px", fontWeight: 700 }}
+                >
+                  {resetLoading ? "Updating Password..." : "Update Password & Sign In"}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

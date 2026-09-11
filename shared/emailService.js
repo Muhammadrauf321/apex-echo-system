@@ -70,6 +70,30 @@ Website: https://apex-education-forum.web.app`;
   return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
+// Generate direct Gmail Web Compose URL specifically for Password Reset
+export function generateForgotPasswordGmailUrl({ recipientEmail, resetUrl, tempCode }) {
+  const subject = `Apex Ecosystem - Password Reset Request`;
+  const body = `Dear User,
+
+We received a request to reset your password for the Apex Education Forum Ecosystem.
+
+Please click the secure link below to choose your new password:
+
+🔗 Reset Password Link:
+${resetUrl}
+
+🔑 Verification Token:
+${tempCode}
+
+If you did not request this password reset, please disregard this email. Your existing credentials remain completely safe and active.
+
+Best regards,
+Apex Education Forum Security Team
+Website: https://apex-education-forum.web.app`;
+
+  return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(recipientEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 // Send real automated email via EmailJS directly to inbox
 export async function sendActivationEmail({ recipientEmail, recipientName, role, activationUrl, tempCode }) {
   const config = getEmailJSConfig();

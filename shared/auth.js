@@ -6,10 +6,11 @@ import {
   signOut as fbSignOut, 
   onAuthStateChanged,
   GoogleAuthProvider,
-  signInWithPopup
+  signInWithPopup,
+  sendPasswordResetEmail
 } from "firebase/auth";
 import { doc, getDoc, setDoc, collection, getDocs } from "firebase/firestore";
-import { sendActivationEmail, generateGmailComposeUrl } from "./emailService.js";
+import { sendActivationEmail, generateGmailComposeUrl, generateForgotPasswordGmailUrl } from "./emailService.js";
 import { sendFirebaseActivationEmail } from "./firebaseEmailService.js";
 import { ROLES } from "./constants.js";
 import { updateTeacherStatus } from "./dataStore.js";
@@ -352,13 +353,14 @@ export async function createAccountInvitation({ name, email, role, department = 
     tempCode
   });
 
-  // 1. Attempt official Firebase direct delivery (free Google mail servers)
+  // Send activation email via EmailJS with instant Gmail 1-click fallback
+  // NOTE: We DO NOT send Firebase sendOobCode PASSWORD_RESET for invitations, as that misleads users with "Reset Password"
   let deliveryStatus = "pending";
   let deliveryError = null;
-  let deliveryProvider = "Firebase";
+  let deliveryProvider = "EmailJS";
 
   try {
-    const fbRes = await sendFirebaseActivationEmail({
+    const emailRes = await sendActivationEmail({
       recipientEmail: cleanEmail,
       recipientName: name.trim(),
       role: roleName,
@@ -366,33 +368,19 @@ export async function createAccountInvitation({ name, email, role, department = 
       tempCode
     });
 
-    if (fbRes.success) {
-      deliveryStatus = "delivered_firebase";
-      deliveryProvider = "Firebase";
+    if (emailRes.success) {
+      deliveryStatus = "delivered_emailjs";
+      deliveryProvider = "EmailJS";
+    } else if (emailRes.unconfigured) {
+      deliveryStatus = "pending_delivery";
+      deliveryError = emailRes.error;
     } else {
-      console.warn("Firebase email dispatch notice:", fbRes.error);
-      // 2. Fallback to EmailJS if configured
-      const emailRes = await sendActivationEmail({
-        recipientEmail: cleanEmail,
-        recipientName: name.trim(),
-        role: roleName,
-        activationUrl,
-        tempCode
-      });
-      if (emailRes.success) {
-        deliveryStatus = "delivered_emailjs";
-        deliveryProvider = "EmailJS";
-      } else if (emailRes.unconfigured) {
-        deliveryStatus = "pending_delivery";
-        deliveryError = fbRes.error || emailRes.error;
-      } else {
-        deliveryStatus = "failed";
-        deliveryError = fbRes.error || emailRes.error;
-      }
+      deliveryStatus = "failed";
+      deliveryError = emailRes.error;
     }
   } catch (e) {
     deliveryStatus = "failed";
-    deliveryError = e?.message || "Failed to dispatch email";
+    deliveryError = e?.message || "Failed to dispatch email via EmailJS";
   }
 
   const emailObject = {
@@ -833,3 +821,182 @@ export async function loginWithGoogle() {
     return { success: false, error: err.message || "Failed to sign in with Google" };
   }
 }
+
+// =========================================================================
+// DEDICATED FORGOT PASSWORD / PASSWORD RESET WORKFLOW
+// =========================================================================
+
+const PASSWORD_RESETS_KEY = "apex_password_resets";
+
+export function getPasswordResets() {
+  const data = safeStorage.getItem(PASSWORD_RESETS_KEY);
+  return data ? JSON.parse(data) : [];
+}
+
+export function savePasswordResets(resets) {
+  safeStorage.setItem(PASSWORD_RESETS_KEY, JSON.stringify(resets));
+}
+
+/**
+ * Initiates a password reset for any registered email.
+ * Generates a secure reset token & code, logs the request, attempts Firebase sendPasswordResetEmail,
+ * and provides a 1-click direct Gmail compose URL fallback.
+ */
+export async function requestPasswordReset(email) {
+  if (!email || !email.trim()) {
+    return { success: false, error: "Please provide a valid email address." };
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  // Check if email exists in registered accounts, admin, or invitations
+  const accounts = getRegisteredAccounts();
+  const matchedAccount = accounts.find(a => a.email.toLowerCase() === cleanEmail);
+  const isAdmin = cleanEmail === "muhammadraufbaloch6@gmail.com" || cleanEmail === ADMIN_USER.email.toLowerCase();
+
+  // Generate Reset Token & Security Code
+  const resetToken = `rst_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const tempCode = `RESET-${Math.floor(100000 + Math.random() * 900000)}`;
+
+  const origin = typeof window !== "undefined" && window.location.origin
+    ? window.location.origin
+    : "https://apex-education-forum.web.app";
+  const resetUrl = `${origin}/?resetPassword=${resetToken}&email=${encodeURIComponent(cleanEmail)}`;
+
+  const resetRecord = {
+    id: `reset_${Date.now()}`,
+    token: resetToken,
+    tempCode,
+    email: cleanEmail,
+    createdAt: new Date().toISOString(),
+    status: "pending",
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  };
+
+  const existingResets = getPasswordResets();
+  savePasswordResets([resetRecord, ...existingResets]);
+
+  // Sync to Firestore if online
+  try {
+    await setDoc(doc(db, "password_resets", resetRecord.id), resetRecord, { merge: true });
+  } catch (e) {
+    console.warn("Firestore password reset sync notice:", e);
+  }
+
+  // Attempt real Firebase sendPasswordResetEmail
+  let firebaseSent = false;
+  let firebaseError = null;
+  try {
+    await sendPasswordResetEmail(auth, cleanEmail);
+    firebaseSent = true;
+  } catch (fbErr) {
+    console.warn("Firebase sendPasswordResetEmail notice:", fbErr?.code || fbErr?.message);
+    firebaseError = fbErr?.code || fbErr?.message;
+  }
+
+  // Also generate 1-click Gmail fallback
+  const gmailComposeUrl = generateForgotPasswordGmailUrl({
+    recipientEmail: cleanEmail,
+    resetUrl,
+    tempCode
+  });
+
+  return {
+    success: true,
+    resetToken,
+    tempCode,
+    resetUrl,
+    gmailComposeUrl,
+    firebaseSent,
+    firebaseError,
+    message: firebaseSent 
+      ? `A password reset link has been dispatched to ${cleanEmail}.`
+      : `Password reset link generated for ${cleanEmail}. Click Send via Gmail or use the reset code.`
+  };
+}
+
+/**
+ * Completes the password reset by applying the new password to local storage, Firestore, and logging the user in.
+ */
+export async function completePasswordReset({ token, tempCode, email, newPassword }) {
+  if (!newPassword || newPassword.length < 6) {
+    return { success: false, error: "New password must be at least 6 characters long." };
+  }
+
+  const cleanEmail = (email || "").trim().toLowerCase();
+  const cleanToken = (token || "").trim();
+  const cleanCode = (tempCode || "").trim().toUpperCase();
+
+  const resets = getPasswordResets();
+  let matchedReset = resets.find(r => 
+    (cleanToken && r.token === cleanToken) || 
+    (cleanCode && r.tempCode.toUpperCase() === cleanCode && r.email.toLowerCase() === cleanEmail)
+  );
+
+  // Check Firestore if not found locally
+  if (!matchedReset && cleanToken) {
+    try {
+      const colRef = collection(db, "password_resets");
+      const snap = await getDocs(colRef);
+      snap.forEach(d => {
+        const data = { id: d.id, ...d.data() };
+        if (data.token === cleanToken || (cleanCode && data.tempCode === cleanCode)) {
+          matchedReset = data;
+        }
+      });
+    } catch (e) {}
+  }
+
+  const targetEmail = matchedReset?.email || cleanEmail;
+  if (!targetEmail) {
+    return { success: false, error: "Invalid or expired password reset link." };
+  }
+
+  // 1. Update registered account password
+  const accounts = getRegisteredAccounts();
+  const accIndex = accounts.findIndex(a => a.email.toLowerCase() === targetEmail);
+  let updatedAccount = null;
+
+  if (accIndex >= 0) {
+    accounts[accIndex].password = newPassword;
+    updatedAccount = accounts[accIndex];
+    saveRegisteredAccount(accounts[accIndex]);
+  } else if (targetEmail === ADMIN_USER.email.toLowerCase() || targetEmail === "muhammadraufbaloch6@gmail.com") {
+    updatedAccount = { ...ADMIN_USER, password: newPassword };
+    saveRegisteredAccount(updatedAccount);
+  } else {
+    // Create new account entry with updated password
+    updatedAccount = {
+      uid: `usr_${Date.now()}`,
+      name: targetEmail.split("@")[0],
+      email: targetEmail,
+      role: "student",
+      password: newPassword,
+      status: "active"
+    };
+    saveRegisteredAccount(updatedAccount);
+  }
+
+  // 2. Mark reset token used
+  if (matchedReset) {
+    const updatedResets = resets.map(r => r.id === matchedReset.id ? { ...r, status: "completed", completedAt: new Date().toISOString() } : r);
+    savePasswordResets(updatedResets);
+    try {
+      await setDoc(doc(db, "password_resets", matchedReset.id), { status: "completed", completedAt: new Date().toISOString() }, { merge: true });
+    } catch (e) {}
+  }
+
+  // 3. Update Firestore user doc
+  try {
+    if (updatedAccount.uid) {
+      await setDoc(doc(db, "users", updatedAccount.uid), { password: newPassword }, { merge: true });
+    }
+  } catch (e) {}
+
+  // 4. Log in immediately
+  setCurrentUser(updatedAccount);
+  updateTeacherStatus(targetEmail, "active");
+
+  return { success: true, user: updatedAccount };
+}
+

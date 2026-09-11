@@ -246,3 +246,162 @@ a.bg-crimson-600:hover {
 .modal-backdrop.active .modal-content {
   transform: scale(1) translateY(0);
 }
+
+/* ==========================================================================
+   Comprehensive Layout, Grid, Responsive & Navigation Fixes
+   ========================================================================== */
+
+/* Prevent sticky collision between EcosystemNav and Main Header */
+.ecosystem-nav {
+  position: relative !important;
+  top: auto !important;
+  z-index: 50 !important;
+}
+
+header.sticky {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 40 !important;
+}
+
+/* Containers and Bounds */
+.max-w-7xl {
+  max-width: 80rem !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  width: 100% !important;
+}
+
+.max-w-4xl {
+  max-width: 56rem !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  width: 100% !important;
+}
+
+.max-w-2xl {
+  max-width: 42rem !important;
+}
+
+.max-w-xl {
+  max-width: 36rem !important;
+}
+
+/* Responsive Grid Systems */
+.grid {
+  display: grid !important;
+}
+
+.grid-cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+}
+
+@media (min-width: 640px) {
+  .sm\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 768px) {
+  .md\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .md\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .lg\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  .lg\:grid-cols-5 {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+  .lg\:grid-cols-12 {
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+  }
+  .lg\:col-span-4 {
+    grid-column: span 4 / span 4 !important;
+  }
+  .lg\:col-span-5 {
+    grid-column: span 5 / span 5 !important;
+  }
+  .lg\:col-span-7 {
+    grid-column: span 7 / span 7 !important;
+  }
+  .lg\:col-span-8 {
+    grid-column: span 8 / span 8 !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  .xl\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+/* Gap classes */
+.gap-2 { gap: 0.5rem !important; }
+.gap-3 { gap: 0.75rem !important; }
+.gap-4 { gap: 1rem !important; }
+.gap-5 { gap: 1.25rem !important; }
+.gap-6 { gap: 1.5rem !important; }
+.gap-8 { gap: 2rem !important; }
+.gap-10 { gap: 2.5rem !important; }
+.gap-12 { gap: 3rem !important; }
+
+/* Flexbox and alignment helpers */
+.flex { display: flex !important; }
+.inline-flex { display: inline-flex !important; }
+.flex-col { flex-direction: column !important; }
+.flex-wrap { flex-wrap: wrap !important; }
+.items-center { align-items: center !important; }
+.items-start { align-items: flex-start !important; }
+.items-stretch { align-items: stretch !important; }
+.justify-between { justify-content: space-between !important; }
+.justify-center { justify-content: center !important; }
+.flex-1 { flex: 1 1 0% !important; }
+.flex-shrink-0 { flex-shrink: 0 !important; }
+.shrink-0 { flex-shrink: 0 !important; }
+
+/* Card Heights & Sizing */
+.tilt-container {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.tilt-card {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+/* Text clipping */
+.line-clamp-1 {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 1 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+.line-clamp-2 {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+}
+
+/* Form inputs consistency */
+input, select, textarea {
+  font-family: inherit !important;
+  box-sizing: border-box !important;
+}
+
+/* Responsive Table & SVG Map fixes */
+svg {
+  max-width: 100% !important;
+  height: auto;
+}
+
