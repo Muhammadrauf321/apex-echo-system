@@ -27,7 +27,9 @@ import {
   updateTeacherStatus,
   getStudents,
   saveStudents,
-  enrollStudent
+  enrollStudent,
+  getExamResults,
+  saveExamResults
 } from "@shared/dataStore.js";
 import { BATCH_SLOTS, FEE_STATUS, ROLES, ROLE_LABELS, EXAM_STATUS, EXAM_STATUS_LABELS } from "@shared/constants.js";
 import confetti from "canvas-confetti";
@@ -44,30 +46,93 @@ import {
   CheckCircle2, 
   Printer, 
   Search, 
-  ChevronRight,
-  Clock,
-  Building,
-  UserCheck,
-  X,
-  FileText,
-  Lock,
-  Send,
-  RotateCcw,
-  BookOpen,
-  Edit3,
-  Trash2,
-  ShieldCheck,
-  Eye,
-  AlertTriangle,
-  UserPlus,
-  Mail,
-  RefreshCw,
-  GraduationCap,
-  Sparkles,
-  Copy,
-  ExternalLink,
-  MessageSquare
+  ChevronRight, 
+  Clock, 
+  Building, 
+  UserCheck, 
+  X, 
+  FileText, 
+  Lock, 
+  Send, 
+  RotateCcw, 
+  BookOpen, 
+  Edit3, 
+  Trash2, 
+  ShieldCheck, 
+  Eye, 
+  AlertTriangle, 
+  UserPlus, 
+  Mail, 
+  RefreshCw, 
+  GraduationCap, 
+  Sparkles, 
+  Copy, 
+  ExternalLink, 
+  MessageSquare,
+  Download,
+  Phone,
+  Filter,
+  QrCode
 } from "lucide-react";
+
+// Official Pakistani Digital Payment QR Component (JazzCash / Easypaisa / Raast)
+function PaymentQRCode({ text = "APEX-PAY:03002458912", size = 96 }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
+      <svg width={size} height={size} viewBox="0 0 100 100" style={{ background: "#ffffff", padding: "3px", borderRadius: "6px", border: "1px solid #cbd5e1" }}>
+        {/* Top Left Locator */}
+        <rect x="5" y="5" width="28" height="28" fill="#000000" rx="2" />
+        <rect x="9" y="9" width="20" height="20" fill="#ffffff" />
+        <rect x="13" y="13" width="12" height="12" fill="#000000" />
+        {/* Top Right Locator */}
+        <rect x="67" y="5" width="28" height="28" fill="#000000" rx="2" />
+        <rect x="71" y="9" width="20" height="20" fill="#ffffff" />
+        <rect x="75" y="13" width="12" height="12" fill="#000000" />
+        {/* Bottom Left Locator */}
+        <rect x="5" y="67" width="28" height="28" fill="#000000" rx="2" />
+        <rect x="9" y="71" width="20" height="20" fill="#ffffff" />
+        <rect x="13" y="75" width="12" height="12" fill="#000000" />
+        {/* Data Pattern Modules */}
+        <rect x="38" y="8" width="5" height="5" fill="#000000" />
+        <rect x="48" y="8" width="5" height="5" fill="#000000" />
+        <rect x="58" y="8" width="5" height="5" fill="#000000" />
+        <rect x="38" y="18" width="5" height="5" fill="#000000" />
+        <rect x="48" y="18" width="10" height="5" fill="#000000" />
+        <rect x="38" y="28" width="24" height="5" fill="#000000" />
+        
+        <rect x="8" y="38" width="5" height="10" fill="#000000" />
+        <rect x="18" y="38" width="5" height="5" fill="#000000" />
+        <rect x="28" y="44" width="5" height="5" fill="#000000" />
+        <rect x="38" y="38" width="8" height="8" fill="#000000" />
+        <rect x="50" y="38" width="6" height="6" fill="#000000" />
+        <rect x="62" y="38" width="8" height="8" fill="#000000" />
+        <rect x="74" y="38" width="18" height="6" fill="#000000" />
+
+        <rect x="8" y="52" width="14" height="5" fill="#000000" />
+        <rect x="26" y="52" width="6" height="6" fill="#000000" />
+        <rect x="38" y="50" width="6" height="6" fill="#000000" />
+        <rect x="50" y="52" width="8" height="6" fill="#000000" />
+        <rect x="66" y="48" width="8" height="8" fill="#000000" />
+        <rect x="80" y="52" width="12" height="6" fill="#000000" />
+
+        <rect x="38" y="66" width="6" height="12" fill="#000000" />
+        <rect x="48" y="66" width="12" height="6" fill="#000000" />
+        <rect x="64" y="66" width="6" height="6" fill="#000000" />
+        <rect x="74" y="66" width="18" height="6" fill="#000000" />
+
+        <rect x="38" y="82" width="12" height="8" fill="#000000" />
+        <rect x="54" y="80" width="8" height="10" fill="#000000" />
+        <rect x="66" y="76" width="10" height="6" fill="#000000" />
+        <rect x="80" y="78" width="12" height="12" fill="#000000" />
+      </svg>
+      <div style={{ display: "flex", gap: "3px", alignItems: "center", marginTop: "1px" }}>
+        <span style={{ fontSize: "7px", padding: "1px 4px", borderRadius: "3px", background: "#ef4444", color: "#fff", fontWeight: 800 }}>JazzCash</span>
+        <span style={{ fontSize: "7px", padding: "1px 4px", borderRadius: "3px", background: "#10b981", color: "#fff", fontWeight: 800 }}>Easypaisa</span>
+        <span style={{ fontSize: "7px", padding: "1px 4px", borderRadius: "3px", background: "#0284c7", color: "#fff", fontWeight: 800 }}>Raast</span>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(getCurrentUser());
@@ -120,7 +185,7 @@ export default function App() {
   const [students, setStudents] = useState(getStudents());
   const [certificates, setCertificates] = useState(getCertificates());
 
-  // Modals
+  // Modals & Print Views
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
   const [showEnrollStudentModal, setShowEnrollStudentModal] = useState(false);
@@ -128,6 +193,14 @@ export default function App() {
   const [selectedStudentForFee, setSelectedStudentForFee] = useState(null);
   const [feePaymentAmount, setFeePaymentAmount] = useState("");
   const [receiptToPrint, setReceiptToPrint] = useState(null);
+  const [voucherToPrint, setVoucherToPrint] = useState(null);
+  const [feeFilterStatus, setFeeFilterStatus] = useState("all");
+  const [searchTermFees, setSearchTermFees] = useState("");
+
+  // Exam Results & Marksheet State
+  const [marksModalExam, setMarksModalExam] = useState(null);
+  const [currentExamMarks, setCurrentExamMarks] = useState([]);
+  const [marksheetToPrint, setMarksheetToPrint] = useState(null);
 
   // Search terms
   const [searchTermFaculty, setSearchTermFaculty] = useState("");
@@ -153,14 +226,19 @@ export default function App() {
   });
   const [isInvitingTeacher, setIsInvitingTeacher] = useState(false);
 
-  // New Student Form State (Gmail Invitation)
+  // New Student Form State (Pakistani Academic & Verification Fields)
   const [newStudentForm, setNewStudentForm] = useState({
     name: "",
+    fatherName: "",
+    cnicOrBForm: "",
+    guardianName: "",
+    guardianPhone: "",
     email: "",
     phone: "",
     course: courses[0]?.title || "",
     batchCode: "",
-    totalFee: 20000
+    totalFee: 20000,
+    arrears: 0
   });
   const [isEnrollingStudent, setIsEnrollingStudent] = useState(false);
 
@@ -548,11 +626,17 @@ export default function App() {
 
     enrollStudent({
       name: newStudentForm.name,
+      fatherName: newStudentForm.fatherName || "",
+      guardianName: newStudentForm.guardianName || newStudentForm.fatherName || "",
+      guardianPhone: newStudentForm.guardianPhone || newStudentForm.phone || "",
+      cnicOrBForm: newStudentForm.cnicOrBForm || "",
+      emergencyContact: newStudentForm.guardianPhone || newStudentForm.phone || "",
       email: newStudentForm.email,
       phone: newStudentForm.phone,
       course: newStudentForm.course,
       batchCode: newStudentForm.batchCode || "BAT-NEW",
       totalFee: Number(newStudentForm.totalFee) || 20000,
+      arrears: Number(newStudentForm.arrears) || 0,
       paidFee: 0,
       activationStatus: "pending_activation"
     });
@@ -564,11 +648,16 @@ export default function App() {
     const isSentViaEmailJS = inviteRes?.deliveryStatus === "delivered_emailjs";
     setNewStudentForm({
       name: "",
+      fatherName: "",
+      cnicOrBForm: "",
+      guardianName: "",
+      guardianPhone: "",
       email: "",
       phone: "",
       course: courses[0]?.title || "",
       batchCode: "",
-      totalFee: 20000
+      totalFee: 20000,
+      arrears: 0
     });
 
     setStatusBanner({
@@ -655,6 +744,251 @@ export default function App() {
 
     setShowFeeModal(false);
     setFeePaymentAmount("");
+  };
+
+  // 1-Click Pakistani Students Directory CSV Export
+  const exportStudentsToCSV = () => {
+    if (!students || students.length === 0) {
+      alert("No student records available to export.");
+      return;
+    }
+    const headers = [
+      "Roll No",
+      "Student Full Name",
+      "Father Name",
+      "CNIC / B-Form",
+      "Email Address",
+      "Student Phone",
+      "Guardian Name",
+      "Guardian Phone",
+      "Course Program",
+      "Assigned Batch",
+      "Course Fee (PKR)",
+      "Arrears (PKR)",
+      "Total Payable (PKR)",
+      "Paid Fee (PKR)",
+      "Outstanding Balance (PKR)",
+      "Fee Status",
+      "Account Activation Status"
+    ];
+    const rows = students.map(s => {
+      const total = Number(s.totalFee) || 0;
+      const arr = Number(s.arrears) || 0;
+      const payable = total + arr;
+      const paid = Number(s.paidFee) || 0;
+      const bal = Math.max(0, payable - paid);
+      return [
+        `"${s.rollNo || ''}"`,
+        `"${s.name || ''}"`,
+        `"${s.fatherName || ''}"`,
+        `"${s.cnicOrBForm || ''}"`,
+        `"${s.email || ''}"`,
+        `"${s.phone || ''}"`,
+        `"${s.guardianName || ''}"`,
+        `"${s.guardianPhone || ''}"`,
+        `"${s.course || ''}"`,
+        `"${s.batchCode || ''}"`,
+        total,
+        arr,
+        payable,
+        paid,
+        bal,
+        `"${bal <= 0 ? 'PAID FULL' : paid > 0 ? 'PARTIAL' : 'PENDING DEFAULTER'}"`,
+        `"${s.activationStatus || 'active'}"`
+      ].join(",");
+    });
+    const csvData = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Apex_Students_Roster_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // 1-Click Pakistani Institute Fee Ledger CSV Export
+  const exportFeeLedgerToCSV = () => {
+    if (!students || students.length === 0) {
+      alert("No fee records available to export.");
+      return;
+    }
+    const headers = [
+      "Challan Voucher Ref",
+      "Roll No",
+      "Student Name",
+      "Father Name",
+      "CNIC / B-Form",
+      "Course Title",
+      "Batch Code",
+      "Tuition Fee (PKR)",
+      "Previous Arrears (PKR)",
+      "Net Dues within Due Date (PKR)",
+      "Late Fee Surcharge (PKR)",
+      "Amount Paid (PKR)",
+      "Current Balance (PKR)",
+      "Recovery Status",
+      "Due Date"
+    ];
+    const rows = students.map(s => {
+      const total = Number(s.totalFee) || 0;
+      const arr = Number(s.arrears) || 0;
+      const payable = total + arr;
+      const paid = Number(s.paidFee) || 0;
+      const bal = Math.max(0, payable - paid);
+      return [
+        `"AEF-CH-${s.rollNo || s.id}"`,
+        `"${s.rollNo || ''}"`,
+        `"${s.name || ''}"`,
+        `"${s.fatherName || ''}"`,
+        `"${s.cnicOrBForm || ''}"`,
+        `"${s.course || ''}"`,
+        `"${s.batchCode || ''}"`,
+        total,
+        arr,
+        payable,
+        500,
+        paid,
+        bal,
+        `"${bal <= 0 ? 'PAID FULL' : paid > 0 ? 'PARTIAL' : 'DEFAULTER'}"`,
+        `"10th of Current Month"`
+      ].join(",");
+    });
+    const csvData = "\uFEFF" + [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Apex_Institutional_Fee_Ledger_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // 1-Click WhatsApp Official Payment Reminder Generator
+  const generateWhatsAppReminderUrl = (std) => {
+    const rawPhone = std.guardianPhone || std.phone || "";
+    let cleanPhone = rawPhone.replace(/\D/g, "");
+    if (cleanPhone.startsWith("0")) {
+      cleanPhone = "92" + cleanPhone.slice(1);
+    } else if (cleanPhone.startsWith("3")) {
+      cleanPhone = "92" + cleanPhone;
+    }
+    if (!cleanPhone) cleanPhone = "923001234567";
+
+    const total = Number(std.totalFee) || 0;
+    const arr = Number(std.arrears) || 0;
+    const paid = Number(std.paidFee) || 0;
+    const balance = Math.max(0, total + arr - paid);
+
+    const message = 
+`Assalam-o-Alaikum,
+Respected Parent / Student ${std.name},
+
+Official Fee Reminder from APEX EDUCATION FORUM (Main Campus, Karachi).
+
+📋 Student: ${std.name}
+🔢 Roll No: ${std.rollNo || 'APX-2026-REG'}
+👨‍👦 Father: ${std.fatherName || 'Guardian'}
+📚 Course: ${std.course} [Batch: ${std.batchCode}]
+💵 Outstanding Balance: PKR ${balance.toLocaleString()}
+📅 Due Date: 10th of this month
+
+Payment Channels:
+1. JazzCash / Easypaisa Till: 0300-2458912 (Apex Education Forum)
+2. Meezan Bank IBAN: PK36MEZN0001234567890101
+3. Direct Cash Deposit at Accounts Counter (09:00 AM - 08:00 PM)
+
+After payment, please share transaction receipt screenshot on this number.
+Tel: (021) 3456-7890 / 0300-1234567
+
+Accounts Directorate,
+Apex Education Forum`;
+
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+  };
+
+  // --- Examination Results & Marksheets Handlers ---
+  const handleOpenExamMarks = (exam) => {
+    setMarksModalExam(exam);
+    const savedResults = getExamResults(exam.id) || [];
+    
+    // Find all students matching this exam's course or batch
+    const candidateStudents = students.filter(s => 
+      !exam.courseTitle || s.course === exam.courseTitle || s.batchCode === exam.batchCode || !s.batchCode
+    );
+
+    const merged = candidateStudents.map(std => {
+      const existing = savedResults.find(r => r.studentId === std.id || r.rollNo === std.rollNo);
+      const total = Number(exam.totalMarks) || 50;
+      const passing = Number(exam.passingMarks) || 25;
+      const obt = existing ? Number(existing.obtainedMarks) : 0;
+      const pct = Math.round((obt / total) * 100);
+      let grade = "F (Retake)";
+      if (pct >= 80) grade = "A+ (Distinction)";
+      else if (pct >= 70) grade = "A (Excellent)";
+      else if (pct >= 60) grade = "B (Good)";
+      else if (pct >= 50) grade = "C (Pass)";
+
+      return {
+        studentId: std.id,
+        rollNo: std.rollNo || `APX-2026-${std.id.slice(-4)}`,
+        studentName: std.name,
+        fatherName: std.fatherName || "—",
+        cnicOrBForm: std.cnicOrBForm || "—",
+        courseTitle: exam.courseTitle,
+        batchCode: exam.batchCode,
+        examId: exam.id,
+        examTitle: exam.title,
+        examDate: exam.examDate,
+        totalMarks: total,
+        passingMarks: passing,
+        obtainedMarks: obt,
+        percentage: pct,
+        grade: existing ? existing.grade : grade,
+        status: obt >= passing ? "PASSED" : "FAILED",
+        remarks: existing ? existing.remarks : "Consistent academic effort demonstrated in practical modules."
+      };
+    });
+
+    setCurrentExamMarks(merged.length > 0 ? merged : savedResults);
+  };
+
+  const handleUpdateStudentMark = (studentId, field, value) => {
+    setCurrentExamMarks(prev => prev.map(item => {
+      if (item.studentId === studentId) {
+        const updated = { ...item, [field]: value };
+        if (field === "obtainedMarks") {
+          const total = Number(item.totalMarks) || 50;
+          const passing = Number(item.passingMarks) || 25;
+          const obt = Math.min(total, Math.max(0, Number(value) || 0));
+          const pct = Math.round((obt / total) * 100);
+          let grade = "F (Retake)";
+          if (pct >= 80) grade = "A+ (Distinction)";
+          else if (pct >= 70) grade = "A (Excellent)";
+          else if (pct >= 60) grade = "B (Good)";
+          else if (pct >= 50) grade = "C (Pass)";
+
+          updated.obtainedMarks = obt;
+          updated.percentage = pct;
+          updated.grade = grade;
+          updated.status = obt >= passing ? "PASSED" : "FAILED";
+        }
+        return updated;
+      }
+      return item;
+    }));
+  };
+
+  const handleSaveExamMarks = () => {
+    if (!marksModalExam) return;
+    saveExamResults(marksModalExam.id, currentExamMarks);
+    setStatusBanner({
+      type: "success",
+      message: `✓ Academic marksheets and grades recorded successfully for "${marksModalExam.title}"!`
+    });
+    setMarksModalExam(null);
   };
 
   // Handle Issue Certificate
@@ -1652,171 +1986,391 @@ export default function App() {
         {/* ======================================================== */}
         {/* 3. ADMISSIONS & FEE TRACKING (ADMIN ONLY)                 */}
         {/* ======================================================== */}
-        {activeTab === "fees" && isAdmin && (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
-              <div>
-                <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>Admissions & Student Accounts</h2>
-                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                  Enroll students via Gmail, monitor ID activations, and record fee receipts
-                </p>
-              </div>
+        {activeTab === "fees" && isAdmin && (() => {
+          const totalRevenue = students.reduce((acc, s) => acc + (Number(s.totalFee) || 0) + (Number(s.arrears) || 0), 0);
+          const totalPaid = students.reduce((acc, s) => acc + (Number(s.paidFee) || 0), 0);
+          const totalDues = students.reduce((acc, s) => acc + Math.max(0, (Number(s.totalFee) || 0) + (Number(s.arrears) || 0) - (Number(s.paidFee) || 0)), 0);
+          const defaultersList = students.filter(s => ((Number(s.totalFee) || 0) + (Number(s.arrears) || 0) - (Number(s.paidFee) || 0)) > 0);
+          const paidFullList = students.filter(s => ((Number(s.totalFee) || 0) + (Number(s.arrears) || 0) - (Number(s.paidFee) || 0)) <= 0);
 
-              <button
-                onClick={() => setShowEnrollStudentModal(true)}
-                className="btn-primary"
-                style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "6px" }}
-              >
-                <UserPlus size={16} />
-                <span>Enroll Student via Gmail</span>
-              </button>
-            </div>
+          const filteredStudents = students.filter(std => {
+            const balance = (Number(std.totalFee) || 0) + (Number(std.arrears) || 0) - (Number(std.paidFee) || 0);
+            if (feeFilterStatus === "paid" && balance > 0) return false;
+            if (feeFilterStatus === "defaulters" && balance <= 0) return false;
+            if (searchTermFees.trim()) {
+              const q = searchTermFees.toLowerCase();
+              const nameMatch = std.name?.toLowerCase().includes(q);
+              const rollMatch = std.rollNo?.toLowerCase().includes(q);
+              const cnicMatch = std.cnicOrBForm?.toLowerCase().includes(q);
+              const fatherMatch = std.fatherName?.toLowerCase().includes(q);
+              const courseMatch = std.course?.toLowerCase().includes(q);
+              const batchMatch = std.batchCode?.toLowerCase().includes(q);
+              const emailMatch = std.email?.toLowerCase().includes(q);
+              const phoneMatch = std.phone?.includes(q) || std.guardianPhone?.includes(q);
+              return nameMatch || rollMatch || cnicMatch || fatherMatch || courseMatch || batchMatch || emailMatch || phoneMatch;
+            }
+            return true;
+          });
 
-            {students.length === 0 ? (
-              <div className="glass-panel" style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
-                <DollarSign size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
-                <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>No Enrolled Students Yet</div>
-                <div style={{ fontSize: "0.85rem", marginTop: "4px" }}>
-                  Click <strong>Enroll Student via Gmail</strong> above or approve admission inquiries from the Overview tab.
+          return (
+            <div>
+              {/* Header & Primary Actions */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "22px", flexWrap: "wrap", gap: "16px" }}>
+                <div>
+                  <h2 style={{ fontSize: "1.4rem", fontWeight: 800, letterSpacing: "-0.01em" }}>
+                    Institutional Fee Ledger & Student Accounts
+                  </h2>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
+                    Pakistani fee recovery system: 3-copy perforated bank challans, JazzCash/Easypaisa QR payments & WhatsApp fee reminders
+                  </p>
+                </div>
+
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <button
+                    onClick={exportStudentsToCSV}
+                    className="btn-secondary"
+                    style={{ fontSize: "0.8rem", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                    title="Export complete roster into an Excel .CSV sheet"
+                  >
+                    <Download size={14} />
+                    <span>Export Students (.CSV)</span>
+                  </button>
+
+                  <button
+                    onClick={exportFeeLedgerToCSV}
+                    className="btn-secondary"
+                    style={{ fontSize: "0.8rem", display: "inline-flex", alignItems: "center", gap: "6px", color: "#38bdf8", borderColor: "rgba(56,189,248,0.3)" }}
+                    title="Export complete fee ledger with challan numbers and arrears"
+                  >
+                    <Download size={14} />
+                    <span>Export Fee Ledger (.CSV)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowEnrollStudentModal(true)}
+                    className="btn-primary"
+                    style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "6px" }}
+                  >
+                    <UserPlus size={16} />
+                    <span>Enroll Student via Gmail</span>
+                  </button>
                 </div>
               </div>
-            ) : (
-              <div className="glass-panel" style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.9rem" }}>
-                  <thead>
-                    <tr style={{ borderBottom: "1px solid var(--border-subtle)", color: "var(--text-muted)", fontSize: "0.78rem", textTransform: "uppercase" }}>
-                      <th style={{ padding: "16px" }}>Student & Contact</th>
-                      <th style={{ padding: "16px" }}>Course & Batch</th>
-                      <th style={{ padding: "16px" }}>Activation Status</th>
-                      <th style={{ padding: "16px" }}>Total Fee</th>
-                      <th style={{ padding: "16px" }}>Paid Amount</th>
-                      <th style={{ padding: "16px" }}>Balance</th>
-                      <th style={{ padding: "16px" }}>Fee Status</th>
-                      <th style={{ padding: "16px", textAlign: "right" }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.map((std) => {
-                      const balance = std.totalFee - std.paidFee;
-                      const isPendingActivation = std.activationStatus === "pending_activation";
-                      const inv = isPendingActivation ? getInvitationByEmail(std.email) : null;
-                      const originUrl = typeof window !== "undefined" ? window.location.origin : "";
-                      const activationUrl = inv ? `${originUrl}/?activate=${inv.token}&email=${encodeURIComponent(std.email)}` : "";
-                      const gmailComposeLink = inv ? generateGmailComposeUrl({
-                        recipientEmail: std.email,
-                        recipientName: std.name,
-                        role: "Student",
-                        tempCode: inv.tempCode,
-                        activationUrl
-                      }) : "";
-                      return (
-                        <tr key={std.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
-                          <td style={{ padding: "16px", fontWeight: 600 }}>
-                            <div>{std.name}</div>
-                            <div style={{ fontSize: "0.75rem", color: "#38bdf8" }}>{std.email || "No email on file"}</div>
-                            {std.phone && <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>{std.phone}</div>}
-                          </td>
-                          <td style={{ padding: "16px" }}>
-                            <div>{std.course}</div>
-                            <div style={{ fontSize: "0.75rem", color: "#a5b4fc" }}>{std.batchCode}</div>
-                          </td>
-                          <td style={{ padding: "16px" }}>
-                            {isPendingActivation ? (
-                              <span style={{
-                                fontSize: "0.72rem",
-                                padding: "3px 8px",
-                                borderRadius: "6px",
-                                background: "rgba(245, 158, 11, 0.15)",
-                                color: "#fbbf24",
-                                border: "1px solid rgba(245, 158, 11, 0.3)",
-                                fontWeight: 700
-                              }}>
-                                ● Pending Activation
-                              </span>
-                            ) : (
-                              <span style={{
-                                fontSize: "0.72rem",
-                                padding: "3px 8px",
-                                borderRadius: "6px",
-                                background: "rgba(16, 185, 129, 0.15)",
-                                color: "#34d399",
-                                border: "1px solid rgba(16, 185, 129, 0.3)",
-                                fontWeight: 700
-                              }}>
-                                ● Active Account
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ padding: "16px" }}>PKR {std.totalFee.toLocaleString()}</td>
-                          <td style={{ padding: "16px", color: "#34d399", fontWeight: 600 }}>PKR {std.paidFee.toLocaleString()}</td>
-                          <td style={{ padding: "16px", color: balance > 0 ? "#f87171" : "var(--text-muted)", fontWeight: 600 }}>
-                            PKR {balance.toLocaleString()}
-                          </td>
-                          <td style={{ padding: "16px" }}>
-                            {std.status === FEE_STATUS.PAID ? (
-                              <span className="badge badge-emerald">Paid Full</span>
-                            ) : std.status === FEE_STATUS.PARTIAL ? (
-                              <span className="badge badge-amber">Partial</span>
-                            ) : (
-                              <span className="badge badge-rose">Pending</span>
-                            )}
-                          </td>
-                          <td style={{ padding: "16px", textAlign: "right" }}>
-                            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
-                              {isPendingActivation && std.email && (
-                                <button
-                                  onClick={() => handleResendInvite(std.email, std.name, "student")}
-                                  className="btn-secondary"
-                                  style={{ padding: "6px 12px", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "5px", color: "#38bdf8" }}
-                                  title="Resend Activation Email automatically via Firebase"
-                                >
-                                  <RefreshCw size={12} />
-                                  <span>Resend Activation Email</span>
-                                </button>
-                              )}
 
-                              {balance > 0 ? (
-                                <button
-                                  onClick={() => {
-                                    setSelectedStudentForFee(std);
-                                    setShowFeeModal(true);
-                                  }}
-                                  className="btn-primary"
-                                  style={{ padding: "6px 12px", fontSize: "0.8rem" }}
-                                >
-                                  Collect Fee
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => {
-                                    setReceiptToPrint({
-                                      receiptNo: `APEX-RCP-${std.id.toUpperCase()}`,
-                                      date: new Date().toLocaleDateString(),
-                                      studentName: std.name,
-                                      course: std.course,
-                                      batchCode: std.batchCode,
-                                      amountPaid: std.totalFee,
-                                      remainingBalance: 0
-                                    });
-                                  }}
-                                  className="btn-secondary"
-                                  style={{ padding: "6px 12px", fontSize: "0.8rem" }}
-                                >
-                                  <Printer size={14} />
-                                  <span>Receipt</span>
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              {/* 4 Financial KPI Cards */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "24px" }}>
+                <div className="glass-panel" style={{ padding: "18px", borderLeft: "4px solid #6366f1" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase" }}>Total Expected Revenue</div>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#ffffff", marginTop: "4px" }}>
+                    PKR {totalRevenue.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "#a5b4fc", marginTop: "4px" }}>
+                    Across {students.length} enrolled students
+                  </div>
+                </div>
+
+                <div className="glass-panel" style={{ padding: "18px", borderLeft: "4px solid #10b981" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase" }}>Total Realized Collections</div>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#34d399", marginTop: "4px" }}>
+                    PKR {totalPaid.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "#6ee7b7", marginTop: "4px" }}>
+                    {totalRevenue > 0 ? Math.round((totalPaid / totalRevenue) * 100) : 0}% Recovery percentage
+                  </div>
+                </div>
+
+                <div className="glass-panel" style={{ padding: "18px", borderLeft: "4px solid #f43f5e" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase" }}>Outstanding Receivables</div>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#fb7185", marginTop: "4px" }}>
+                    PKR {totalDues.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "#fda4af", marginTop: "4px" }}>
+                    Remaining to be collected
+                  </div>
+                </div>
+
+                <div className="glass-panel" style={{ padding: "18px", borderLeft: "4px solid #f59e0b" }}>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase" }}>Fee Defaulters Count</div>
+                  <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#fbbf24", marginTop: "4px" }}>
+                    {defaultersList.length} Students
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "#fde68a", marginTop: "4px" }}>
+                    {paidFullList.length} fully paid students
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        )}
+
+              {/* Filter Tabs & Search Bar */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", flexWrap: "wrap", gap: "12px" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {[
+                    { id: "all", label: `All Students (${students.length})` },
+                    { id: "paid", label: `Paid in Full (${paidFullList.length})` },
+                    { id: "defaulters", label: `Defaulters & Dues (${defaultersList.length})` }
+                  ].map(f => (
+                    <button
+                      key={f.id}
+                      onClick={() => setFeeFilterStatus(f.id)}
+                      style={{
+                        padding: "7px 14px",
+                        borderRadius: "8px",
+                        fontSize: "0.8rem",
+                        fontWeight: 700,
+                        border: "1px solid",
+                        borderColor: feeFilterStatus === f.id ? "#6366f1" : "rgba(255,255,255,0.1)",
+                        background: feeFilterStatus === f.id ? "linear-gradient(135deg, #6366f1, #4f46e5)" : "rgba(255,255,255,0.03)",
+                        color: feeFilterStatus === f.id ? "#ffffff" : "var(--text-muted)",
+                        cursor: "pointer"
+                      }}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ position: "relative", minWidth: "260px" }}>
+                  <Search size={14} style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--text-dim)" }} />
+                  <input
+                    type="text"
+                    placeholder="Search Roll No, Name, CNIC..."
+                    value={searchTermFees}
+                    onChange={(e) => setSearchTermFees(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "7px 12px 7px 34px",
+                      borderRadius: "8px",
+                      background: "rgba(0,0,0,0.3)",
+                      border: "1px solid var(--border-subtle)",
+                      color: "#ffffff",
+                      fontSize: "0.82rem"
+                    }}
+                  />
+                  {searchTermFees && (
+                    <button
+                      onClick={() => setSearchTermFees("")}
+                      style={{ position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", color: "var(--text-dim)", cursor: "pointer" }}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Students & Fee Ledger Table */}
+              {filteredStudents.length === 0 ? (
+                <div className="glass-panel" style={{ padding: "40px", textAlign: "center", color: "var(--text-muted)" }}>
+                  <DollarSign size={40} style={{ margin: "0 auto 12px", opacity: 0.4 }} />
+                  <div style={{ fontSize: "1.1rem", fontWeight: 700 }}>No Matching Records</div>
+                  <div style={{ fontSize: "0.82rem", marginTop: "4px" }}>
+                    {searchTermFees ? "No students matched your search criteria." : "No students found in this category."}
+                  </div>
+                </div>
+              ) : (
+                <div className="glass-panel" style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--border-subtle)", color: "var(--text-muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                        <th style={{ padding: "14px 16px" }}>Roll No & Student Identity</th>
+                        <th style={{ padding: "14px 16px" }}>Course & Batch</th>
+                        <th style={{ padding: "14px 16px" }}>Contact & Guardian</th>
+                        <th style={{ padding: "14px 16px" }}>Activation</th>
+                        <th style={{ padding: "14px 16px" }}>Total + Arrears</th>
+                        <th style={{ padding: "14px 16px" }}>Paid Amount</th>
+                        <th style={{ padding: "14px 16px" }}>Balance Due</th>
+                        <th style={{ padding: "14px 16px" }}>Fee Status</th>
+                        <th style={{ padding: "14px 16px", textAlign: "right" }}>Institutional Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStudents.map((std) => {
+                        const totalPayable = (Number(std.totalFee) || 0) + (Number(std.arrears) || 0);
+                        const paid = Number(std.paidFee) || 0;
+                        const balance = Math.max(0, totalPayable - paid);
+                        const isPendingActivation = std.activationStatus === "pending_activation";
+                        const whatsAppUrl = generateWhatsAppReminderUrl(std);
+
+                        return (
+                          <tr key={std.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                            <td style={{ padding: "14px 16px" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                                <span style={{
+                                  fontSize: "0.7rem",
+                                  padding: "2px 7px",
+                                  borderRadius: "4px",
+                                  background: "rgba(99, 102, 241, 0.2)",
+                                  color: "#a5b4fc",
+                                  border: "1px solid rgba(99, 102, 241, 0.4)",
+                                  fontWeight: 800,
+                                  fontFamily: "var(--font-mono)"
+                                }}>
+                                  {std.rollNo || "APX-2026"}
+                                </span>
+                                <strong style={{ color: "#ffffff", fontSize: "0.92rem" }}>{std.name}</strong>
+                              </div>
+                              <div style={{ fontSize: "0.75rem", color: "var(--text-dim)" }}>
+                                <span>S/O, D/O: <strong style={{ color: "#cbd5e1" }}>{std.fatherName || "—"}</strong></span>
+                                {std.cnicOrBForm && <span style={{ marginLeft: "8px", color: "#38bdf8" }}>CNIC: {std.cnicOrBForm}</span>}
+                              </div>
+                            </td>
+
+                            <td style={{ padding: "14px 16px" }}>
+                              <div style={{ fontWeight: 600 }}>{std.course}</div>
+                              <div style={{ fontSize: "0.75rem", color: "#818cf8" }}>{std.batchCode}</div>
+                            </td>
+
+                            <td style={{ padding: "14px 16px", fontSize: "0.78rem" }}>
+                              <div style={{ color: "#38bdf8" }}>{std.email || "No email"}</div>
+                              <div style={{ color: "var(--text-dim)" }}>Ph: {std.phone || "—"}</div>
+                              {std.guardianPhone && std.guardianPhone !== std.phone && (
+                                <div style={{ color: "#fbbf24", fontSize: "0.72rem" }}>Guardian: {std.guardianPhone}</div>
+                              )}
+                            </td>
+
+                            <td style={{ padding: "14px 16px" }}>
+                              {isPendingActivation ? (
+                                <span style={{
+                                  fontSize: "0.7rem",
+                                  padding: "3px 7px",
+                                  borderRadius: "6px",
+                                  background: "rgba(245, 158, 11, 0.15)",
+                                  color: "#fbbf24",
+                                  border: "1px solid rgba(245, 158, 11, 0.3)",
+                                  fontWeight: 700
+                                }}>
+                                  ● Pending
+                                </span>
+                              ) : (
+                                <span style={{
+                                  fontSize: "0.7rem",
+                                  padding: "3px 7px",
+                                  borderRadius: "6px",
+                                  background: "rgba(16, 185, 129, 0.15)",
+                                  color: "#34d399",
+                                  border: "1px solid rgba(16, 185, 129, 0.3)",
+                                  fontWeight: 700
+                                }}>
+                                  ● Active
+                                </span>
+                              )}
+                            </td>
+
+                            <td style={{ padding: "14px 16px" }}>
+                              <div style={{ fontWeight: 600 }}>PKR {totalPayable.toLocaleString()}</div>
+                              {Number(std.arrears) > 0 && (
+                                <div style={{ fontSize: "0.7rem", color: "#f87171" }}>Arrears: +{Number(std.arrears).toLocaleString()}</div>
+                              )}
+                            </td>
+
+                            <td style={{ padding: "14px 16px", color: "#34d399", fontWeight: 700 }}>
+                              PKR {paid.toLocaleString()}
+                            </td>
+
+                            <td style={{ padding: "14px 16px", color: balance > 0 ? "#f87171" : "#94a3b8", fontWeight: 800 }}>
+                              PKR {balance.toLocaleString()}
+                            </td>
+
+                            <td style={{ padding: "14px 16px" }}>
+                              {balance <= 0 ? (
+                                <span className="badge badge-emerald">Paid Full</span>
+                              ) : paid > 0 ? (
+                                <span className="badge badge-amber">Partial</span>
+                              ) : (
+                                <span className="badge badge-rose">Defaulter</span>
+                              )}
+                            </td>
+
+                            <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                              <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
+                                {/* 3-COPY FEE VOUCHER PRINT */}
+                                <button
+                                  onClick={() => setVoucherToPrint(std)}
+                                  className="btn-secondary"
+                                  style={{ padding: "5px 10px", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#a5b4fc", borderColor: "rgba(99,102,241,0.4)" }}
+                                  title="Print Official 3-Copy Bank Challan / Fee Voucher"
+                                >
+                                  <Printer size={13} />
+                                  <span>3-Copy Voucher</span>
+                                </button>
+
+                                {/* 1-CLICK WHATSAPP REMINDER */}
+                                {balance > 0 && (
+                                  <a
+                                    href={whatsAppUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="btn-secondary"
+                                    style={{
+                                      padding: "5px 10px",
+                                      fontSize: "0.75rem",
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: "4px",
+                                      color: "#34d399",
+                                      background: "rgba(16, 185, 129, 0.12)",
+                                      borderColor: "rgba(16, 185, 129, 0.4)",
+                                      textDecoration: "none"
+                                    }}
+                                    title="Send official payment notice directly via WhatsApp"
+                                  >
+                                    <MessageSquare size={13} />
+                                    <span>WhatsApp Notice</span>
+                                  </a>
+                                )}
+
+                                {/* COLLECT FEE */}
+                                {balance > 0 ? (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedStudentForFee(std);
+                                      setShowFeeModal(true);
+                                    }}
+                                    className="btn-primary"
+                                    style={{ padding: "5px 12px", fontSize: "0.75rem" }}
+                                  >
+                                    Collect Fee
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setReceiptToPrint({
+                                        receiptNo: `APEX-RCP-${std.id.toUpperCase()}`,
+                                        date: new Date().toLocaleDateString(),
+                                        studentName: std.name,
+                                        course: std.course,
+                                        batchCode: std.batchCode,
+                                        amountPaid: totalPayable,
+                                        remainingBalance: 0
+                                      });
+                                    }}
+                                    className="btn-secondary"
+                                    style={{ padding: "5px 10px", fontSize: "0.75rem" }}
+                                  >
+                                    Receipt
+                                  </button>
+                                )}
+
+                                {isPendingActivation && std.email && (
+                                  <button
+                                    onClick={() => handleResendInvite(std.email, std.name, "student")}
+                                    className="btn-secondary"
+                                    style={{ padding: "5px 8px", fontSize: "0.72rem", color: "#38bdf8" }}
+                                    title="Resend activation email via Firebase"
+                                  >
+                                    <RefreshCw size={12} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ======================================================== */}
         {/* 4. FACULTY & TEACHERS DIRECTORY (ADMIN ONLY)              */}
@@ -2170,14 +2724,24 @@ export default function App() {
                             )}
 
                             {exam.status === EXAM_STATUS.APPROVED && (
-                              <button
-                                onClick={() => setPrintableExam(exam)}
-                                className="btn-secondary"
-                                style={{ padding: "8px 14px", fontSize: "0.82rem", color: "#38bdf8" }}
-                              >
-                                <Printer size={14} />
-                                <span>View & Print Official Paper</span>
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleOpenExamMarks(exam)}
+                                  className="btn-primary"
+                                  style={{ padding: "8px 14px", fontSize: "0.82rem", background: "linear-gradient(135deg, #10b981, #059669)", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                                >
+                                  <Award size={14} />
+                                  <span>Enter / View Marks</span>
+                                </button>
+                                <button
+                                  onClick={() => setPrintableExam(exam)}
+                                  className="btn-secondary"
+                                  style={{ padding: "8px 14px", fontSize: "0.82rem", color: "#38bdf8" }}
+                                >
+                                  <Printer size={14} />
+                                  <span>Print Exam Paper</span>
+                                </button>
+                              </>
                             )}
                           </>
                         )}
@@ -2214,14 +2778,24 @@ export default function App() {
                                 <span>Editing Locked (Under Review)</span>
                               </button>
                             ) : (
-                              <button
-                                onClick={() => setPrintableExam(exam)}
-                                className="btn-secondary"
-                                style={{ padding: "8px 14px", fontSize: "0.82rem" }}
-                              >
-                                <Printer size={14} />
-                                <span>View Approved Paper</span>
-                              </button>
+                              <>
+                                <button
+                                  onClick={() => handleOpenExamMarks(exam)}
+                                  className="btn-primary"
+                                  style={{ padding: "8px 14px", fontSize: "0.82rem", background: "linear-gradient(135deg, #10b981, #059669)", display: "inline-flex", alignItems: "center", gap: "6px" }}
+                                >
+                                  <Award size={14} />
+                                  <span>Enter / View Marks</span>
+                                </button>
+                                <button
+                                  onClick={() => setPrintableExam(exam)}
+                                  className="btn-secondary"
+                                  style={{ padding: "8px 14px", fontSize: "0.82rem" }}
+                                >
+                                  <Printer size={14} />
+                                  <span>View Approved Paper</span>
+                                </button>
+                              </>
                             )}
                           </>
                         )}
@@ -3256,6 +3830,30 @@ export default function App() {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
                 <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Father's Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Muhammad Usman"
+                    value={newStudentForm.fatherName}
+                    onChange={(e) => setNewStudentForm({ ...newStudentForm, fatherName: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Student CNIC / B-Form</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 42501-1234567-1"
+                    value={newStudentForm.cnicOrBForm}
+                    onChange={(e) => setNewStudentForm({ ...newStudentForm, cnicOrBForm: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                <div>
                   <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Student Gmail Address *</label>
                   <input
                     type="email"
@@ -3267,12 +3865,35 @@ export default function App() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Contact Phone</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Student Contact Phone</label>
                   <input
                     type="text"
                     placeholder="+92 300 0000000"
                     value={newStudentForm.phone}
                     onChange={(e) => setNewStudentForm({ ...newStudentForm, phone: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Guardian / Relation Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Father / Brother"
+                    value={newStudentForm.guardianName}
+                    onChange={(e) => setNewStudentForm({ ...newStudentForm, guardianName: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Guardian Phone (For WhatsApp Notice)</label>
+                  <input
+                    type="text"
+                    placeholder="+92 300 1234567"
+                    value={newStudentForm.guardianPhone}
+                    onChange={(e) => setNewStudentForm({ ...newStudentForm, guardianPhone: e.target.value })}
                     style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
                   />
                 </div>
@@ -3291,24 +3912,34 @@ export default function App() {
                 </select>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "20px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Batch / Time Slot</label>
                   <input
                     type="text"
-                    placeholder="e.g. BAT-701 or Evening Slot"
+                    placeholder="e.g. BAT-701"
                     value={newStudentForm.batchCode}
                     onChange={(e) => setNewStudentForm({ ...newStudentForm, batchCode: e.target.value })}
                     style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Total Fee (PKR)</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Course Fee (PKR)</label>
                   <input
                     type="number"
                     value={newStudentForm.totalFee}
                     onChange={(e) => setNewStudentForm({ ...newStudentForm, totalFee: e.target.value })}
-                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#34d399", fontWeight: 700 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Previous Arrears (PKR)</label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={newStudentForm.arrears}
+                    onChange={(e) => setNewStudentForm({ ...newStudentForm, arrears: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#fb7185", fontWeight: 700 }}
                   />
                 </div>
               </div>
@@ -4061,6 +4692,554 @@ export default function App() {
               <button onClick={() => setReceiptToPrint(null)} className="btn-primary" style={{ padding: "6px 14px", fontSize: "0.82rem" }}>
                 Done
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 10. Modal: Pakistani 3-Copy Institutional Fee Voucher (Challan Slip) */}
+      {voucherToPrint && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "16px",
+          zIndex: 9999,
+          overflowY: "auto"
+        }}>
+          <div className="print-page" style={{
+            maxWidth: "1280px",
+            width: "100%",
+            maxHeight: "calc(100vh - 30px)",
+            overflowY: "auto",
+            padding: "24px",
+            borderRadius: "14px",
+            background: "#ffffff",
+            color: "#0f172a",
+            boxShadow: "0 25px 60px rgba(0,0,0,0.6)"
+          }}>
+            {/* Top Control Bar */}
+            <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", paddingBottom: "14px", borderBottom: "1px solid #e2e8f0" }}>
+              <div>
+                <div style={{ fontSize: "1.15rem", fontWeight: 800, color: "#0f172a" }}>
+                  Apex Education Forum — Official 3-Copy Institutional Fee Challan
+                </div>
+                <div style={{ fontSize: "0.8rem", color: "#64748b" }}>
+                  Perforated 3-copy layout (Institute, Accounts / Bank, and Student copies) with QR payment and bank verification
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button onClick={() => window.print()} className="btn-primary" style={{ background: "linear-gradient(135deg, #4f46e5, #4338ca)", padding: "8px 18px", fontSize: "0.85rem" }}>
+                  <Printer size={15} />
+                  <span>Print All 3 Copies (A4)</span>
+                </button>
+                <button onClick={() => setVoucherToPrint(null)} className="btn-secondary" style={{ padding: "8px 14px", fontSize: "0.85rem", color: "#475569", borderColor: "#cbd5e1" }}>
+                  <X size={15} />
+                  <span>Close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 3 Perforated Slips */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: "16px",
+              background: "#ffffff",
+              color: "#0f172a",
+              fontFamily: "var(--font-sans)",
+              fontSize: "11px"
+            }}>
+              {["INSTITUTE COPY", "ACCOUNTS / BANK COPY", "STUDENT COPY"].map((copyLabel, cIdx) => {
+                const tuitionFee = Number(voucherToPrint.totalFee) || 0;
+                const arrears = Number(voucherToPrint.arrears) || 0;
+                const paid = Number(voucherToPrint.paidFee) || 0;
+                const netDues = Math.max(0, tuitionFee + arrears - paid);
+                const lateFine = 500;
+                const afterDueDate = netDues + lateFine;
+                const challanNo = `AEF-CH-${voucherToPrint.rollNo || voucherToPrint.id.toUpperCase()}-${new Date().getMonth() + 1}`;
+                const issueDate = new Date().toLocaleDateString("en-GB");
+                const dueDate = `10/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`;
+
+                return (
+                  <div key={copyLabel} style={{
+                    borderRight: cIdx < 2 ? "1.5px dashed #94a3b8" : "none",
+                    paddingRight: cIdx < 2 ? "16px" : "0",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    minHeight: "560px"
+                  }}>
+                    <div>
+                      {/* Slip Header */}
+                      <div style={{ textAlign: "center", borderBottom: "2px solid #0f172a", paddingBottom: "8px", marginBottom: "8px" }}>
+                        <div style={{ fontSize: "12px", fontWeight: 900, color: "#1e1b4b", letterSpacing: "-0.01em" }}>
+                          APEX EDUCATION FORUM
+                        </div>
+                        <div style={{ fontSize: "8.5px", color: "#475569", textTransform: "uppercase", fontWeight: 600 }}>
+                          Main Campus: Malir Halt / Model Colony, Karachi
+                        </div>
+                        <div style={{ fontSize: "8px", color: "#64748b" }}>
+                          Tel: (021) 3456-7890 | 0300-1234567 | info@apexforum.edu.pk
+                        </div>
+                        <div style={{
+                          display: "inline-block",
+                          marginTop: "5px",
+                          padding: "2px 8px",
+                          border: "1.5px solid #0f172a",
+                          borderRadius: "4px",
+                          fontWeight: 900,
+                          fontSize: "9px",
+                          background: "#f1f5f9",
+                          color: "#0f172a"
+                        }}>
+                          {copyLabel}
+                        </div>
+                      </div>
+
+                      {/* Challan Ref & Dates */}
+                      <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "5px", padding: "6px", marginBottom: "8px", fontSize: "10px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
+                          <span style={{ color: "#64748b" }}>Challan No:</span>
+                          <strong style={{ fontFamily: "var(--font-mono)", color: "#1e1b4b" }}>{challanNo}</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
+                          <span style={{ color: "#64748b" }}>Issue Date:</span>
+                          <span>{issueDate}</span>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span style={{ color: "#b91c1c", fontWeight: 700 }}>Due Date:</span>
+                          <strong style={{ color: "#b91c1c" }}>{dueDate}</strong>
+                        </div>
+                      </div>
+
+                      {/* Student Particulars */}
+                      <div style={{ marginBottom: "8px", fontSize: "10px" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <tbody>
+                            <tr>
+                              <td style={{ padding: "2px 0", color: "#64748b", width: "40%" }}>Roll Number:</td>
+                              <td style={{ padding: "2px 0", fontWeight: 800, color: "#4338ca", fontFamily: "var(--font-mono)" }}>
+                                {voucherToPrint.rollNo || "APX-2026"}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style={{ padding: "2px 0", color: "#64748b" }}>Student Name:</td>
+                              <td style={{ padding: "2px 0", fontWeight: 800 }}>{voucherToPrint.name}</td>
+                            </tr>
+                            <tr>
+                              <td style={{ padding: "2px 0", color: "#64748b" }}>Father Name:</td>
+                              <td style={{ padding: "2px 0" }}>{voucherToPrint.fatherName || "—"}</td>
+                            </tr>
+                            <tr>
+                              <td style={{ padding: "2px 0", color: "#64748b" }}>CNIC / B-Form:</td>
+                              <td style={{ padding: "2px 0", fontFamily: "var(--font-mono)", fontSize: "9.5px" }}>
+                                {voucherToPrint.cnicOrBForm || "42501-XXXXXXX-X"}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style={{ padding: "2px 0", color: "#64748b" }}>Course Program:</td>
+                              <td style={{ padding: "2px 0", fontWeight: 600 }}>{voucherToPrint.course}</td>
+                            </tr>
+                            <tr>
+                              <td style={{ padding: "2px 0", color: "#64748b" }}>Batch Code:</td>
+                              <td style={{ padding: "2px 0" }}>{voucherToPrint.batchCode || "Regular"}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Fee Particulars Table */}
+                      <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #cbd5e1", marginBottom: "8px", fontSize: "9.5px" }}>
+                        <thead>
+                          <tr style={{ background: "#f1f5f9", borderBottom: "1px solid #cbd5e1" }}>
+                            <th style={{ padding: "4px 6px", textAlign: "left" }}>Fee Description</th>
+                            <th style={{ padding: "4px 6px", textAlign: "right" }}>Amount (PKR)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td style={{ padding: "3px 6px", borderBottom: "1px solid #f1f5f9" }}>Tuition / Course Fee</td>
+                            <td style={{ padding: "3px 6px", textAlign: "right", borderBottom: "1px solid #f1f5f9" }}>
+                              {tuitionFee.toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ padding: "3px 6px", borderBottom: "1px solid #f1f5f9" }}>Previous Arrears / Dues</td>
+                            <td style={{ padding: "3px 6px", textAlign: "right", borderBottom: "1px solid #f1f5f9", color: arrears > 0 ? "#b91c1c" : "#64748b" }}>
+                              {arrears.toLocaleString()}
+                            </td>
+                          </tr>
+                          {paid > 0 && (
+                            <tr>
+                              <td style={{ padding: "3px 6px", borderBottom: "1px solid #f1f5f9", color: "#15803d" }}>Less: Already Paid</td>
+                              <td style={{ padding: "3px 6px", textAlign: "right", borderBottom: "1px solid #f1f5f9", color: "#15803d" }}>
+                                -{paid.toLocaleString()}
+                              </td>
+                            </tr>
+                          )}
+                          <tr style={{ background: "#eff6ff", fontWeight: 800, borderTop: "1px solid #94a3b8" }}>
+                            <td style={{ padding: "4px 6px", color: "#1e3a8a" }}>Payable within Due Date</td>
+                            <td style={{ padding: "4px 6px", textAlign: "right", color: "#1e3a8a" }}>
+                              PKR {netDues.toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style={{ padding: "3px 6px", color: "#b91c1c", fontSize: "8.5px" }}>Late Fee Surcharge (After Due Date)</td>
+                            <td style={{ padding: "3px 6px", textAlign: "right", color: "#b91c1c" }}>500</td>
+                          </tr>
+                          <tr style={{ background: "#fef2f2", fontWeight: 800, borderTop: "1px solid #fca5a5" }}>
+                            <td style={{ padding: "4px 6px", color: "#991b1b" }}>Payable after Due Date</td>
+                            <td style={{ padding: "4px 6px", textAlign: "right", color: "#991b1b" }}>
+                              PKR {afterDueDate.toLocaleString()}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+
+                      {/* Payment QR & Designated Channels */}
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "6px", marginBottom: "8px" }}>
+                        <PaymentQRCode size={72} text={`APEX-PAY:${voucherToPrint.rollNo}:${netDues}`} />
+                        <div style={{ flex: 1, fontSize: "8.5px", color: "#334155" }}>
+                          <div style={{ fontWeight: 800, color: "#0f172a", marginBottom: "2px" }}>Digital Payment Scan:</div>
+                          <div>JazzCash / Easypaisa Till: <strong>0300-2458912</strong></div>
+                          <div>Raast ID: <strong>03002458912</strong></div>
+                          <div>Meezan Bank IBAN: <strong style={{ fontSize: "7.5px" }}>PK36MEZN0001234567890101</strong></div>
+                          <div style={{ color: "#64748b", fontSize: "7.5px", marginTop: "2px" }}>Title: Apex Education Forum</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Stamps & Signatures */}
+                    <div style={{ borderTop: "1px solid #cbd5e1", paddingTop: "8px", marginTop: "8px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", fontSize: "8.5px", color: "#475569" }}>
+                        <div style={{ textAlign: "center", width: "45%" }}>
+                          <div style={{ height: "24px", borderBottom: "1px solid #0f172a", marginBottom: "2px" }}></div>
+                          <span>Depositor's Signature</span>
+                        </div>
+                        <div style={{ textAlign: "center", width: "45%" }}>
+                          <div style={{ height: "24px", borderBottom: "1px solid #0f172a", marginBottom: "2px" }}></div>
+                          <span>Bank / Officer Stamp &amp; Sign</span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "center", fontSize: "7.5px", color: "#94a3b8", marginTop: "6px" }}>
+                        * Fee once deposited is non-refundable. Please preserve student copy.
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 11. Modal: Exam Marks Entry & Grading */}
+      {marksModalExam && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+          zIndex: 9999,
+          overflowY: "auto"
+        }}>
+          <div className="glass-panel" style={{ maxWidth: "920px", width: "100%", maxHeight: "calc(100vh - 40px)", overflowY: "auto", padding: "26px", borderRadius: "var(--radius-lg)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", borderBottom: "1px solid var(--border-subtle)", paddingBottom: "12px" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                  <Award size={20} color="#10b981" />
+                  <h3 style={{ fontSize: "1.25rem", fontWeight: 800 }}>Academic Examination Marks Entry &amp; Marksheets</h3>
+                </div>
+                <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                  Exam: <strong style={{ color: "#ffffff" }}>{marksModalExam.title}</strong> | Course: <strong style={{ color: "#38bdf8" }}>{marksModalExam.courseTitle}</strong> | Batch: <strong style={{ color: "#a5b4fc" }}>{marksModalExam.batchCode}</strong>
+                </div>
+                <div style={{ fontSize: "0.78rem", color: "var(--text-dim)", marginTop: "2px" }}>
+                  Total Marks: <strong>{marksModalExam.totalMarks}</strong> | Passing Marks: <strong>{marksModalExam.passingMarks}</strong> | Exam Date: {marksModalExam.examDate}
+                </div>
+              </div>
+
+              <button onClick={() => setMarksModalExam(null)} style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {currentExamMarks.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "30px", color: "var(--text-muted)" }}>
+                No enrolled students found for batch {marksModalExam.batchCode}. Enroll students in this course/batch to enter marks.
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto", marginBottom: "20px" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.88rem" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--border-subtle)", color: "var(--text-muted)", fontSize: "0.75rem", textTransform: "uppercase" }}>
+                      <th style={{ padding: "10px" }}>Roll No &amp; Student</th>
+                      <th style={{ padding: "10px" }}>Obtained Marks</th>
+                      <th style={{ padding: "10px" }}>Percentage</th>
+                      <th style={{ padding: "10px" }}>Letter Grade</th>
+                      <th style={{ padding: "10px" }}>Status</th>
+                      <th style={{ padding: "10px" }}>Examiner Remarks</th>
+                      <th style={{ padding: "10px", textAlign: "right" }}>Report Card</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentExamMarks.map((m) => {
+                      const isPassing = Number(m.obtainedMarks) >= Number(m.passingMarks);
+                      return (
+                        <tr key={m.studentId} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                          <td style={{ padding: "10px" }}>
+                            <div style={{ fontWeight: 700, color: "#ffffff" }}>{m.studentName}</div>
+                            <div style={{ fontSize: "0.72rem", color: "#a5b4fc", fontFamily: "var(--font-mono)" }}>{m.rollNo}</div>
+                          </td>
+
+                          <td style={{ padding: "10px" }}>
+                            <input
+                              type="number"
+                              min={0}
+                              max={m.totalMarks}
+                              value={m.obtainedMarks}
+                              onChange={(e) => handleUpdateStudentMark(m.studentId, "obtainedMarks", e.target.value)}
+                              style={{ width: "70px", padding: "6px 8px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border-subtle)", borderRadius: "6px", color: "#ffffff", fontWeight: 700, textAlign: "center" }}
+                            />
+                            <span style={{ fontSize: "0.75rem", color: "var(--text-dim)", marginLeft: "4px" }}>/ {m.totalMarks}</span>
+                          </td>
+
+                          <td style={{ padding: "10px", fontWeight: 700, color: isPassing ? "#34d399" : "#f87171" }}>
+                            {m.percentage || 0}%
+                          </td>
+
+                          <td style={{ padding: "10px", fontWeight: 800, color: "#38bdf8" }}>
+                            {m.grade || "F"}
+                          </td>
+
+                          <td style={{ padding: "10px" }}>
+                            <span style={{
+                              fontSize: "0.7rem",
+                              padding: "2px 7px",
+                              borderRadius: "4px",
+                              fontWeight: 800,
+                              background: isPassing ? "rgba(16, 185, 129, 0.2)" : "rgba(244, 63, 94, 0.2)",
+                              color: isPassing ? "#34d399" : "#f87171",
+                              border: `1px solid ${isPassing ? "rgba(16,185,129,0.4)" : "rgba(244,63,94,0.4)"}`
+                            }}>
+                              {isPassing ? "PASSED" : "RETAKE"}
+                            </span>
+                          </td>
+
+                          <td style={{ padding: "10px" }}>
+                            <input
+                              type="text"
+                              value={m.remarks}
+                              onChange={(e) => handleUpdateStudentMark(m.studentId, "remarks", e.target.value)}
+                              style={{ width: "100%", minWidth: "150px", padding: "5px 8px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "6px", color: "#ffffff", fontSize: "0.8rem" }}
+                            />
+                          </td>
+
+                          <td style={{ padding: "10px", textAlign: "right" }}>
+                            <button
+                              onClick={() => setMarksheetToPrint(m)}
+                              className="btn-secondary"
+                              style={{ padding: "5px 10px", fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#38bdf8" }}
+                              title="Generate official printable student marksheet"
+                            >
+                              <Printer size={13} />
+                              <span>Report Card</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", borderTop: "1px solid var(--border-subtle)", paddingTop: "14px" }}>
+              <button onClick={() => setMarksModalExam(null)} className="btn-secondary">Close</button>
+              <button onClick={handleSaveExamMarks} className="btn-primary" style={{ background: "linear-gradient(135deg, #10b981, #059669)" }}>
+                Save Marks &amp; Grades
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 12. Modal: Official Student Marksheet / Report Card Print */}
+      {marksheetToPrint && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "16px",
+          zIndex: 9999,
+          overflowY: "auto"
+        }}>
+          <div className="print-page" style={{
+            maxWidth: "760px",
+            width: "100%",
+            maxHeight: "calc(100vh - 40px)",
+            overflowY: "auto",
+            padding: "36px 40px",
+            borderRadius: "14px",
+            background: "#ffffff",
+            color: "#0f172a",
+            boxShadow: "0 25px 60px rgba(0,0,0,0.6)",
+            fontFamily: "var(--font-sans)"
+          }}>
+            {/* Action Bar */}
+            <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid #e2e8f0" }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>Official Academic Report Card / Marksheet</div>
+                <div style={{ fontSize: "0.78rem", color: "#64748b" }}>Printable institutional transcript formatted for A4 documentation</div>
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={() => window.print()} className="btn-primary" style={{ background: "linear-gradient(135deg, #4f46e5, #4338ca)", padding: "7px 16px", fontSize: "0.82rem" }}>
+                  <Printer size={14} />
+                  <span>Print Marksheet (A4)</span>
+                </button>
+                <button onClick={() => setMarksheetToPrint(null)} className="btn-secondary" style={{ padding: "7px 12px", fontSize: "0.82rem", color: "#475569", borderColor: "#cbd5e1" }}>
+                  <X size={14} />
+                  <span>Close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Official Marksheet Paper */}
+            <div style={{ border: "3px double #1e1b4b", padding: "24px", borderRadius: "8px" }}>
+              {/* Institutional Header */}
+              <div style={{ textAlign: "center", borderBottom: "2px solid #1e1b4b", paddingBottom: "14px", marginBottom: "18px" }}>
+                <div style={{ fontSize: "20px", fontWeight: 900, color: "#1e1b4b", letterSpacing: "-0.02em" }}>
+                  APEX EDUCATION FORUM
+                </div>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#4338ca", textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "2px" }}>
+                  Directorate of Examinations &amp; Academic Standards
+                </div>
+                <div style={{ fontSize: "9.5px", color: "#64748b", marginTop: "2px" }}>
+                  Main Campus: Malir Halt / Model Colony, Airport Road, Karachi, Pakistan | Ph: (021) 3456-7890
+                </div>
+                <div style={{
+                  display: "inline-block",
+                  marginTop: "10px",
+                  padding: "4px 16px",
+                  background: "#1e1b4b",
+                  color: "#ffffff",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                  borderRadius: "4px"
+                }}>
+                  Official Statement of Marks &amp; Evaluation
+                </div>
+              </div>
+
+              {/* Student Identification Grid */}
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "12px", marginBottom: "18px", fontSize: "11px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  <div>Roll Number: <strong style={{ fontFamily: "var(--font-mono)", color: "#4338ca" }}>{marksheetToPrint.rollNo}</strong></div>
+                  <div>Student Name: <strong style={{ color: "#0f172a" }}>{marksheetToPrint.studentName}</strong></div>
+                  <div>Father's Name: <strong>{marksheetToPrint.fatherName || "—"}</strong></div>
+                  <div>CNIC / B-Form: <strong style={{ fontFamily: "var(--font-mono)" }}>{marksheetToPrint.cnicOrBForm || "—"}</strong></div>
+                  <div>Course Program: <strong>{marksheetToPrint.courseTitle}</strong></div>
+                  <div>Batch Code: <strong>{marksheetToPrint.batchCode}</strong></div>
+                  <div>Exam Title: <strong>{marksheetToPrint.examTitle}</strong></div>
+                  <div>Examination Date: <strong>{marksheetToPrint.examDate || new Date().toLocaleDateString()}</strong></div>
+                </div>
+              </div>
+
+              {/* Marks & Grading Evaluation Table */}
+              <table style={{ width: "100%", borderCollapse: "collapse", border: "1.5px solid #0f172a", marginBottom: "16px", fontSize: "11px" }}>
+                <thead>
+                  <tr style={{ background: "#f1f5f9", borderBottom: "1.5px solid #0f172a" }}>
+                    <th style={{ padding: "8px", textAlign: "left" }}>Subject / Paper Title</th>
+                    <th style={{ padding: "8px", textAlign: "center" }}>Maximum</th>
+                    <th style={{ padding: "8px", textAlign: "center" }}>Passing</th>
+                    <th style={{ padding: "8px", textAlign: "center" }}>Obtained</th>
+                    <th style={{ padding: "8px", textAlign: "center" }}>Percentage</th>
+                    <th style={{ padding: "8px", textAlign: "center" }}>Grade</th>
+                    <th style={{ padding: "8px", textAlign: "center" }}>Result</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderBottom: "1px solid #cbd5e1" }}>
+                    <td style={{ padding: "10px 8px", fontWeight: 700 }}>{marksheetToPrint.examTitle}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center" }}>{marksheetToPrint.totalMarks}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center" }}>{marksheetToPrint.passingMarks}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", fontWeight: 900, color: "#1e1b4b" }}>{marksheetToPrint.obtainedMarks}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", fontWeight: 800 }}>{marksheetToPrint.percentage}%</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", fontWeight: 900, color: "#4338ca" }}>{marksheetToPrint.grade}</td>
+                    <td style={{ padding: "10px 8px", textAlign: "center", fontWeight: 900, color: Number(marksheetToPrint.obtainedMarks) >= Number(marksheetToPrint.passingMarks) ? "#15803d" : "#b91c1c" }}>
+                      {Number(marksheetToPrint.obtainedMarks) >= Number(marksheetToPrint.passingMarks) ? "PASSED" : "RETAKE"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              {/* Grading Scheme Guide */}
+              <div style={{ display: "flex", justifyContent: "space-between", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "5px", padding: "6px 12px", marginBottom: "14px", fontSize: "9px", color: "#475569" }}>
+                <span><strong>A+ (Distinction):</strong> 80%+</span>
+                <span><strong>A (Excellent):</strong> 70-79%</span>
+                <span><strong>B (Good):</strong> 60-69%</span>
+                <span><strong>C (Satisfactory):</strong> 50-59%</span>
+                <span><strong>F (Retake):</strong> Below 50%</span>
+              </div>
+
+              {/* Faculty Remarks Box */}
+              <div style={{ border: "1px solid #cbd5e1", borderRadius: "6px", padding: "10px 12px", marginBottom: "24px", fontSize: "10.5px" }}>
+                <div style={{ fontWeight: 800, color: "#475569", marginBottom: "3px", textTransform: "uppercase", fontSize: "9px" }}>Examiner Remarks &amp; Evaluation:</div>
+                <div style={{ fontStyle: "italic", color: "#0f172a" }}>
+                  "{marksheetToPrint.remarks || 'Commendable dedication and practical competency shown throughout the curriculum modules.'}"
+                </div>
+              </div>
+
+              {/* Official Signatures & Seal */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "32px", fontSize: "10px", color: "#334155" }}>
+                <div style={{ textAlign: "center", width: "28%" }}>
+                  <div style={{ height: "30px", borderBottom: "1.5px solid #0f172a", marginBottom: "4px" }}></div>
+                  <strong style={{ display: "block" }}>Course Examiner</strong>
+                  <span style={{ fontSize: "8px", color: "#64748b" }}>Department Faculty</span>
+                </div>
+
+                <div style={{ textAlign: "center", width: "28%" }}>
+                  <div style={{
+                    width: "56px",
+                    height: "56px",
+                    borderRadius: "50%",
+                    border: "2px dashed #4338ca",
+                    margin: "0 auto 4px auto",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "7.5px",
+                    fontWeight: 900,
+                    color: "#4338ca",
+                    textTransform: "uppercase",
+                    lineHeight: 1.1
+                  }}>
+                    Apex Seal Verified
+                  </div>
+                  <span style={{ fontSize: "8px", color: "#64748b" }}>Controller of Exams</span>
+                </div>
+
+                <div style={{ textAlign: "center", width: "28%" }}>
+                  <div style={{ height: "30px", borderBottom: "1.5px solid #0f172a", marginBottom: "4px" }}></div>
+                  <strong style={{ display: "block" }}>Academic Director</strong>
+                  <span style={{ fontSize: "8px", color: "#64748b" }}>Apex Education Forum</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

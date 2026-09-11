@@ -485,7 +485,23 @@ export function createBatch(batchData) {
 // --- Students ---
 export function getStudents() {
   const data = localStorage.getItem(STORAGE_KEYS.STUDENTS);
-  return data ? JSON.parse(data) : [];
+  if (!data) return [];
+  try {
+    const list = JSON.parse(data);
+    return list.map((s, idx) => ({
+      ...s,
+      rollNo: s.rollNo || `APX-2026-${String(idx + 1).padStart(4, "0")}`,
+      fatherName: s.fatherName || "",
+      guardianName: s.guardianName || s.fatherName || "",
+      guardianPhone: s.guardianPhone || s.phone || "",
+      cnicOrBForm: s.cnicOrBForm || "",
+      arrears: Number(s.arrears) || 0,
+      totalFee: Number(s.totalFee) || 20000,
+      paidFee: Number(s.paidFee) || 0
+    }));
+  } catch (e) {
+    return [];
+  }
 }
 
 export function saveStudents(students) {
@@ -497,14 +513,21 @@ export function enrollStudent(studentData) {
   const students = getStudents();
   const newStudent = {
     id: `std_${Date.now().toString().slice(-4)}`,
+    rollNo: studentData.rollNo || `APX-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
     name: studentData.name,
+    fatherName: studentData.fatherName || "",
+    guardianName: studentData.guardianName || studentData.fatherName || "",
+    guardianPhone: studentData.guardianPhone || studentData.phone || "",
+    cnicOrBForm: studentData.cnicOrBForm || "",
     email: studentData.email || "",
     phone: studentData.phone || "",
+    emergencyContact: studentData.emergencyContact || studentData.guardianPhone || "",
     course: studentData.course,
     batchCode: studentData.batchCode || "Assigned Soon",
-    totalFee: studentData.totalFee || 20000,
-    paidFee: studentData.paidFee || 0,
-    status: studentData.paidFee >= (studentData.totalFee || 20000) ? FEE_STATUS.PAID : FEE_STATUS.PENDING,
+    totalFee: Number(studentData.totalFee) || 20000,
+    paidFee: Number(studentData.paidFee) || 0,
+    arrears: Number(studentData.arrears) || 0,
+    status: (Number(studentData.paidFee) || 0) >= (Number(studentData.totalFee) || 20000) ? FEE_STATUS.PAID : FEE_STATUS.PENDING,
     activationStatus: studentData.activationStatus || "pending_activation",
     attendance: studentData.attendance || 100,
     createdAt: new Date().toISOString()
@@ -512,6 +535,19 @@ export function enrollStudent(studentData) {
   const updated = [newStudent, ...students];
   saveStudents(updated);
   return newStudent;
+}
+
+// --- Exam Results / Marksheets ---
+export function getExamResults(examId) {
+  const allResults = JSON.parse(localStorage.getItem("apex_exam_results") || "{}");
+  return examId ? (allResults[examId] || []) : allResults;
+}
+
+export function saveExamResults(examId, results) {
+  const allResults = JSON.parse(localStorage.getItem("apex_exam_results") || "{}");
+  allResults[examId] = results;
+  localStorage.setItem("apex_exam_results", JSON.stringify(allResults));
+  window.dispatchEvent(new CustomEvent("apex_exam_results_changed", { detail: { examId, results } }));
 }
 
 // --- Inquiries ---
