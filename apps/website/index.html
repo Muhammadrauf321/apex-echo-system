@@ -1,13 +1,50 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%230d47a1'><path d='M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5'/></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Apex Education Forum | IT & Language Institute</title>
-    <meta name="description" content="Empowering futures in IT (Full-Stack, Python, Graphic Design) and Language Mastery (Spoken English, IELTS, Business Communication) with practical training and certified excellence." />
+    <title>Apex Education Forum | English Fluency, IT &amp; STS Preparation - Malir, Karachi</title>
+    <meta name="description" content="Apex Education Forum is Malir's premier academic center for English Fluency, Computer Skills, Sukkur IBA & STS Test Preparation, and Sindh Job Portal facilitation." />
+
+    <!-- Google Fonts: Plus Jakarta Sans, Inter, Roboto, Outfit, Poppins -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            },
+            colors: {
+              cobalt: {
+                50: '#eef6ff',
+                100: '#d9ebff',
+                500: '#1976d2',
+                600: '#1565c0',
+                700: '#0d47a1',
+                800: '#0a3880',
+                900: '#082554',
+                950: '#051838',
+              },
+              crimson: {
+                500: '#ef4444',
+                600: '#d32f2f',
+                700: '#b71c1c',
+                800: '#991b1b',
+              }
+            }
+          }
+        }
+      }
+    </script>
   </head>
-  <body>
+  <body class="bg-[#f9f9ff] text-slate-800 antialiased selection:bg-cobalt-700 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -1,0 +1,248 @@
+/* ==========================================================================
+   Apex Education Forum - Anti-Gravity Design Engine & Dynamic Theme System
+   ========================================================================== */
+
+:root {
+  --primary-cobalt: #0d47a1;
+  --primary-cobalt-dark: #092f6d;
+  --primary-cobalt-light: #1565c0;
+  --primary-crimson: #d32f2f;
+  --primary-crimson-hover: #b71c1c;
+  --surface-neutral: #f8faff;
+  --surface-card: #ffffff;
+  --surface-tint: #f0f4fc;
+  --border-subtle: #e2e8f0;
+  --text-dark: #1e293b;
+  --text-muted: #64748b;
+  --accent-gold: #f59e0b;
+  --banner-dark: #071e42;
+  --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-family: var(--font-family);
+}
+
+body {
+  background-color: var(--surface-neutral);
+  color: var(--text-dark);
+  overflow-x: hidden;
+  position: relative;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dynamic Theme Utility Classes */
+.dynamic-theme-primary-bg,
+.bg-cobalt-700,
+.bg-cobalt-800 {
+  background-color: var(--primary-cobalt) !important;
+}
+
+.hover\:bg-cobalt-800:hover,
+.hover\:bg-cobalt-900:hover,
+button.bg-cobalt-700:hover,
+a.bg-cobalt-700:hover {
+  background-color: var(--primary-cobalt-dark) !important;
+}
+
+.dynamic-theme-primary-text,
+.text-cobalt-700,
+.text-cobalt-800 {
+  color: var(--primary-cobalt) !important;
+}
+
+.dynamic-theme-primary-border,
+.border-cobalt-600,
+.border-cobalt-700 {
+  border-color: var(--primary-cobalt) !important;
+}
+
+.dynamic-theme-accent-bg,
+.bg-crimson-600,
+.bg-crimson-700 {
+  background-color: var(--primary-crimson) !important;
+}
+
+.hover\:bg-crimson-700:hover,
+.hover\:bg-crimson-800:hover,
+button.bg-crimson-600:hover,
+a.bg-crimson-600:hover {
+  background-color: var(--primary-crimson-hover) !important;
+}
+
+.dynamic-theme-accent-text,
+.text-crimson-600,
+.text-crimson-700 {
+  color: var(--primary-crimson) !important;
+}
+
+.border-crimson-600,
+.border-crimson-700 {
+  border-color: var(--primary-crimson) !important;
+}
+
+.dynamic-theme-banner-bg {
+  background-color: var(--banner-dark) !important;
+}
+
+.brand-gradient {
+  background: linear-gradient(135deg, var(--primary-cobalt) 0%, var(--primary-crimson) 100%) !important;
+}
+
+/* Anti-Gravity Keyframe Animations */
+@keyframes floatUpstream {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(0.8deg);
+  }
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(8px) rotate(-0.8deg);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(211, 47, 47, 0);
+  }
+}
+
+.float-upstream {
+  animation: floatUpstream 6s ease-in-out infinite;
+}
+
+.float-reverse {
+  animation: floatReverse 7s ease-in-out infinite;
+}
+
+.pulse-glow {
+  animation: pulseGlow 2.5s infinite;
+}
+
+/* 3D Tilt Card Perspectives */
+.tilt-container {
+  perspective: 1000px;
+  transform-style: preserve-3d;
+}
+
+.tilt-card {
+  transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.tilt-card:hover {
+  box-shadow: 0 25px 40px -15px rgba(13, 71, 161, 0.18), 0 0 20px 2px rgba(13, 71, 161, 0.06);
+}
+
+.tilt-inner {
+  transform: translateZ(30px);
+  transform-style: preserve-3d;
+}
+
+/* Anti-Gravity Ambient Particle Canvas */
+#antigravity-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.65;
+}
+
+/* Glassmorphism & UI Accents */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.subtle-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(13, 71, 161, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(13, 71, 161, 0.04) 1px, transparent 1px);
+}
+
+.ribbon-popular {
+  position: absolute;
+  top: -12px;
+  right: 24px;
+  background: linear-gradient(90deg, var(--primary-crimson), #ef4444);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 14px;
+  border-radius: 9999px;
+  letter-spacing: 0.05em;
+  box-shadow: 0 4px 12px rgba(211, 47, 47, 0.35);
+}
+
+/* Interactive Accordion Transition */
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, padding 0.3s ease;
+  opacity: 0;
+}
+
+.faq-item.active .faq-answer {
+  max-height: 280px;
+  opacity: 1;
+  padding-top: 0.75rem;
+  padding-bottom: 0.5rem;
+}
+
+.faq-item.active .faq-icon {
+  transform: rotate(180deg);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Modals */
+.modal-backdrop {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.modal-backdrop.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.modal-content {
+  transform: scale(0.95) translateY(10px);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-backdrop.active .modal-content {
+  transform: scale(1) translateY(0);
+}
