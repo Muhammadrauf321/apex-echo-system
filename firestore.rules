@@ -38,6 +38,17 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Password resets & messaging channels
+    match /password_resets/{resetId} {
+      allow read, write: if true;
+    }
+    match /channels/{channelId} {
+      allow read, write: if true;
+      match /messages/{messageId} {
+        allow read, write: if true;
+      }
+    }
+
     // Default rule for all other documents
     match /{document=**} {
       allow read, write: if request.auth != null;

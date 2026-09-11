@@ -37,7 +37,7 @@ function initLocalData() {
   if (typeof window === "undefined" || typeof localStorage === "undefined") return;
 
   // Enforce 100% fresh startup purge: removes all old fake courses, batches, exams, teachers, students, AND messages
-  if (localStorage.getItem("apex_fresh_clean_v9") !== "true") {
+  if (localStorage.getItem("apex_clean_slate_v10") !== "true") {
     localStorage.removeItem(STORAGE_KEYS.COURSES);
     localStorage.removeItem("apex_courses_initialized");
     localStorage.removeItem(STORAGE_KEYS.BATCHES);
@@ -47,6 +47,20 @@ function initLocalData() {
     localStorage.removeItem(STORAGE_KEYS.TEACHERS);
     localStorage.removeItem(STORAGE_KEYS.STUDENTS);
     localStorage.removeItem(STORAGE_KEYS.MESSAGES);
+    localStorage.removeItem("apex_attendance");
+    localStorage.removeItem("apex_invitations");
+    localStorage.removeItem("apex_account_invitations");
+    localStorage.removeItem("apex_dispatched_emails");
+
+    // Clear dynamic exam results
+    try {
+      Object.keys(localStorage).forEach(k => {
+        if (k.startsWith("apex_exam_results_")) {
+          localStorage.removeItem(k);
+        }
+      });
+    } catch (e) {}
+
     localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify([]));
@@ -55,7 +69,7 @@ function initLocalData() {
     localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify({}));
-    localStorage.setItem("apex_fresh_clean_v9", "true");
+    localStorage.setItem("apex_clean_slate_v10", "true");
   }
 
   if (!localStorage.getItem(STORAGE_KEYS.MESSAGES)) {

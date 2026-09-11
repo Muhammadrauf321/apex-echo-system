@@ -80,7 +80,13 @@ function deleteCrossPortCookie(name) {
 // Initial accounts seed: ONLY the real verified Admin (zero mock teachers/students)
 function initAccounts() {
   // Purge any stale demo accounts from storage
-  if (safeStorage.getItem("apex_accounts_fresh_v7") !== "true") {
+  if (safeStorage.getItem("apex_accounts_clean_v10") !== "true") {
+    safeStorage.removeItem(ACCOUNTS_KEY);
+    safeStorage.removeItem("apex_accounts");
+    safeStorage.removeItem("apex_account_invitations");
+    safeStorage.removeItem(INVITATIONS_KEY);
+    safeStorage.removeItem(EMAILS_KEY);
+    
     const initial = [
       {
         ...ADMIN_USER,
@@ -90,7 +96,7 @@ function initAccounts() {
       }
     ];
     safeStorage.setItem(ACCOUNTS_KEY, JSON.stringify(initial));
-    safeStorage.setItem("apex_accounts_fresh_v7", "true");
+    safeStorage.setItem("apex_accounts_clean_v10", "true");
     return;
   }
 
