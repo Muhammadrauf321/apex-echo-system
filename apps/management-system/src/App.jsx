@@ -685,15 +685,21 @@ export default function App() {
       email: recipientEmail,
       role
     });
-    const isFirebase = inviteRes?.deliveryStatus === "delivered_firebase" || inviteRes?.email?.deliveryProvider === "Firebase";
-    const isSentViaEmailJS = inviteRes?.deliveryStatus === "delivered_emailjs";
+    
+    const originUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const activationUrl = inviteRes?.invitation ? `${originUrl}/?activate=${inviteRes.invitation.token}&email=${encodeURIComponent(recipientEmail)}` : "";
+
+    setCreatedTeacherInvite({
+      name,
+      email: recipientEmail,
+      tempCode: inviteRes.invitation?.tempCode || "",
+      activationUrl,
+      gmailComposeUrl: inviteRes?.gmailComposeUrl || ""
+    });
+
     setStatusBanner({
-      type: isFirebase || isSentViaEmailJS ? "success" : "warning",
-      message: isFirebase
-        ? `🔥 Official activation email dispatched directly via Google Firebase to ${recipientEmail}! (Security Code: ${inviteRes.invitation?.tempCode})`
-        : isSentViaEmailJS
-        ? `✓ Activation email delivered directly to ${recipientEmail} inbox via EmailJS! (Security Code: ${inviteRes.invitation?.tempCode}).`
-        : `Invitation code: ${inviteRes.invitation?.tempCode}. Enable 'Email/Password' in Firebase Console for automated inbox delivery, or user can click '1-Click Activate with Google'.`
+      type: "success",
+      message: `New invitation generated (Code: ${inviteRes.invitation?.tempCode}). You can send it via Gmail, share the link, or teacher can click 'Sign in with Google'.`
     });
   };
 
