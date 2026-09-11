@@ -368,14 +368,13 @@ export async function createAccountInvitation({ name, email, role, department = 
     tempCode
   });
 
-  // Send activation email via EmailJS with instant Gmail 1-click fallback
-  // NOTE: We DO NOT send Firebase sendOobCode PASSWORD_RESET for invitations, as that misleads users with "Reset Password"
+  // Automatically dispatch activation email via Google Firebase directly to the recipient's Gmail
   let deliveryStatus = "pending";
   let deliveryError = null;
-  let deliveryProvider = "EmailJS";
+  let deliveryProvider = "Firebase";
 
   try {
-    const emailRes = await sendActivationEmail({
+    const fbRes = await sendFirebaseActivationEmail({
       recipientEmail: cleanEmail,
       recipientName: name.trim(),
       role: roleName,
@@ -383,19 +382,29 @@ export async function createAccountInvitation({ name, email, role, department = 
       tempCode
     });
 
-    if (emailRes.success) {
-      deliveryStatus = "delivered_emailjs";
-      deliveryProvider = "EmailJS";
-    } else if (emailRes.unconfigured) {
-      deliveryStatus = "pending_delivery";
-      deliveryError = emailRes.error;
+    if (fbRes.success) {
+      deliveryStatus = "delivered_firebase";
+      deliveryProvider = "Firebase";
     } else {
-      deliveryStatus = "failed";
-      deliveryError = emailRes.error;
+      // Fallback to EmailJS if configured
+      const emailRes = await sendActivationEmail({
+        recipientEmail: cleanEmail,
+        recipientName: name.trim(),
+        role: roleName,
+        activationUrl,
+        tempCode
+      });
+      if (emailRes.success) {
+        deliveryStatus = "delivered_emailjs";
+        deliveryProvider = "EmailJS";
+      } else {
+        deliveryStatus = "failed";
+        deliveryError = fbRes.error || emailRes.error;
+      }
     }
   } catch (e) {
     deliveryStatus = "failed";
-    deliveryError = e?.message || "Failed to dispatch email via EmailJS";
+    deliveryError = e?.message || "Failed to dispatch email";
   }
 
   const emailObject = {

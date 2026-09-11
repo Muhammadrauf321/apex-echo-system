@@ -188,7 +188,6 @@ export default function App() {
   // Modals & Print Views
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showTeacherModal, setShowTeacherModal] = useState(false);
-  const [createdTeacherInvite, setCreatedTeacherInvite] = useState(null);
   const [showEnrollStudentModal, setShowEnrollStudentModal] = useState(false);
   const [showFeeModal, setShowFeeModal] = useState(false);
   const [selectedStudentForFee, setSelectedStudentForFee] = useState(null);
@@ -595,24 +594,11 @@ export default function App() {
     setTeachers(getTeachers());
     setShowTeacherModal(false);
     const tempCode = inviteRes.success ? inviteRes.invitation.tempCode : "";
-    const originUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const activationUrl = inviteRes?.invitation ? `${originUrl}/?activate=${inviteRes.invitation.token}&email=${encodeURIComponent(newTeacherForm.email)}` : "";
-    const gmailComposeLink = inviteRes?.gmailComposeUrl || "";
-
-    setCreatedTeacherInvite({
-      name: newTeacherForm.name,
-      email: newTeacherForm.email,
-      department: newTeacherForm.department,
-      tempCode,
-      activationUrl,
-      gmailComposeUrl: gmailComposeLink
-    });
-
     setNewTeacherForm({ name: "", email: "", department: "IT & Web Development", phone: "" });
 
     setStatusBanner({
       type: "success",
-      message: `Faculty invitation generated for ${newTeacherForm.name} (${newTeacherForm.email}). Security Code: ${tempCode}.`
+      message: `✓ Faculty member added! Official activation email sent automatically to ${newTeacherForm.email}. (Temp Code: ${tempCode})`
     });
   };
 
@@ -685,21 +671,12 @@ export default function App() {
       email: recipientEmail,
       role
     });
-    
-    const originUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const activationUrl = inviteRes?.invitation ? `${originUrl}/?activate=${inviteRes.invitation.token}&email=${encodeURIComponent(recipientEmail)}` : "";
 
-    setCreatedTeacherInvite({
-      name,
-      email: recipientEmail,
-      tempCode: inviteRes.invitation?.tempCode || "",
-      activationUrl,
-      gmailComposeUrl: inviteRes?.gmailComposeUrl || ""
-    });
+    const tempCode = inviteRes.invitation?.tempCode || "";
 
     setStatusBanner({
       type: "success",
-      message: `New invitation generated (Code: ${inviteRes.invitation?.tempCode}). You can send it via Gmail, share the link, or teacher can click 'Sign in with Google'.`
+      message: `✓ Activation email resent automatically via Google Firebase to ${recipientEmail}! (Temp Code: ${tempCode})`
     });
   };
 
@@ -2472,85 +2449,37 @@ Apex Education Forum`;
                       </div>
 
                       {isPending ? (
-                        <div style={{ marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-                            <span style={{ fontSize: "0.74rem", color: "#94a3b8" }}>
-                              Code: <strong style={{ color: "#38bdf8", letterSpacing: "0.5px" }}>{inv?.tempCode || "Generated"}</strong>
-                            </span>
-                            <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-                              {gmailComposeLink && (
-                                <a
-                                  href={gmailComposeLink}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="btn-secondary"
-                                  style={{
-                                    padding: "4px 10px",
-                                    fontSize: "0.72rem",
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    gap: "4px",
-                                    color: "#f87171",
-                                    borderColor: "rgba(239, 68, 68, 0.35)",
-                                    background: "rgba(239, 68, 68, 0.08)",
-                                    textDecoration: "none"
-                                  }}
-                                  title="Open official invitation in your Gmail with recipient, code, and link pre-filled to send with 1 click"
-                                >
-                                  <Mail size={12} />
-                                  <span>Open in Gmail</span>
-                                </a>
-                              )}
+                        <div style={{ marginTop: "12px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "0.74rem", color: "#94a3b8" }}>
+                            Activation Code: <strong style={{ color: "#38bdf8", letterSpacing: "0.5px" }}>{inv?.tempCode || "Generated"}</strong>
+                          </span>
+                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                            <button
+                              onClick={() => handleResendInvite(t.email, t.name, "instructor")}
+                              className="btn-secondary"
+                              style={{ padding: "4px 10px", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#38bdf8" }}
+                              title="Resend activation email to their Gmail inbox"
+                            >
+                              <RefreshCw size={12} />
+                              <span>Resend Email</span>
+                            </button>
 
-                              {activationUrl && (
-                                <button
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(activationUrl);
-                                    setStatusBanner({
-                                      type: "success",
-                                      message: `Copied activation link for ${t.name}! You can share it on WhatsApp or email.`
-                                    });
-                                  }}
-                                  className="btn-secondary"
-                                  style={{ padding: "4px 10px", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#38bdf8" }}
-                                  title="Copy direct activation URL"
-                                >
-                                  <Copy size={12} />
-                                  <span>Copy Link</span>
-                                </button>
-                              )}
-
-                              <button
-                                onClick={async () => {
-                                  await updateTeacherStatus(t.id, "active");
-                                  setTeachers(getTeachers());
-                                  setStatusBanner({
-                                    type: "success",
-                                    message: `Faculty member "${t.name}" is now marked Active & verified!`
-                                  });
-                                }}
-                                className="btn-secondary"
-                                style={{ padding: "4px 10px", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#34d399", borderColor: "rgba(16, 185, 129, 0.4)", background: "rgba(16, 185, 129, 0.1)" }}
-                                title="Mark instructor as active immediately"
-                              >
-                                <CheckCircle2 size={12} />
-                                <span>Mark Active</span>
-                              </button>
-
-                              <button
-                                onClick={() => handleResendInvite(t.email, t.name, "instructor")}
-                                className="btn-secondary"
-                                style={{ padding: "4px 10px", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#94a3b8" }}
-                                title="Resend invitation and refresh temporary code"
-                              >
-                                <RefreshCw size={12} />
-                                <span>Resend</span>
-                              </button>
-                            </div>
-                          </div>
-
-                          <div style={{ fontSize: "0.72rem", color: "#94a3b8", background: "rgba(255,255,255,0.03)", padding: "7px 10px", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                            💡 <strong>Instant Activation:</strong> The teacher can also simply go to <span style={{ color: "#38bdf8" }}>https://apex-education-forum.web.app/lms/</span> and click <strong>"Sign in with Google"</strong> using <span style={{ color: "#ffffff", fontWeight: 600 }}>{t.email}</span> to activate their Instructor portal immediately!
+                            <button
+                              onClick={async () => {
+                                await updateTeacherStatus(t.id, "active");
+                                setTeachers(getTeachers());
+                                setStatusBanner({
+                                  type: "success",
+                                  message: `Faculty member "${t.name}" is now marked Active & verified!`
+                                });
+                              }}
+                              className="btn-secondary"
+                              style={{ padding: "4px 10px", fontSize: "0.72rem", display: "inline-flex", alignItems: "center", gap: "4px", color: "#34d399", borderColor: "rgba(16, 185, 129, 0.4)", background: "rgba(16, 185, 129, 0.1)" }}
+                              title="Mark instructor as active immediately"
+                            >
+                              <CheckCircle2 size={12} />
+                              <span>Mark Active</span>
+                            </button>
                           </div>
                         </div>
                       ) : (
@@ -3840,119 +3769,10 @@ Apex Education Forum`;
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
                 <button type="button" onClick={() => setShowTeacherModal(false)} className="btn-secondary">Cancel</button>
                 <button type="submit" disabled={isInvitingTeacher} className="btn-primary">
-                  {isInvitingTeacher ? "Creating Invitation..." : "Create Faculty Invitation"}
+                  {isInvitingTeacher ? "Sending Activation Email..." : "Add Faculty & Send Activation Email"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* 1.1 Modal: Faculty Invitation Confirmation & Dispatch Actions */}
-      {createdTeacherInvite && (
-        <div style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(0,0,0,0.85)",
-          backdropFilter: "blur(6px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "20px",
-          zIndex: 99999
-        }}>
-          <div className="glass-panel" style={{ maxWidth: "520px", width: "100%", padding: "28px", borderRadius: "var(--radius-lg)", border: "1px solid rgba(56, 189, 248, 0.4)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: "rgba(16, 185, 129, 0.2)", color: "#34d399", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <CheckCircle2 size={22} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: "1.2rem", fontWeight: 800, color: "#ffffff" }}>Faculty Invitation Generated</h3>
-                  <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{createdTeacherInvite.name} ({createdTeacherInvite.email})</div>
-                </div>
-              </div>
-              <button onClick={() => setCreatedTeacherInvite(null)} style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer" }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ background: "rgba(255, 255, 255, 0.03)", border: "1px solid var(--border-subtle)", borderRadius: "10px", padding: "16px", marginBottom: "18px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>Temporary Security Code:</span>
-                <span style={{ fontSize: "1.15rem", fontWeight: 800, color: "#38bdf8", letterSpacing: "1px" }}>{createdTeacherInvite.tempCode}</span>
-              </div>
-              <div style={{ fontSize: "0.78rem", color: "var(--text-dim)", lineHeight: "1.5" }}>
-                The instructor has been registered into the faculty directory. Choose how to deliver the invitation credentials:
-              </div>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "18px" }}>
-              {createdTeacherInvite.gmailComposeUrl && (
-                <a
-                  href={createdTeacherInvite.gmailComposeUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn-primary"
-                  style={{
-                    background: "linear-gradient(135deg, #ea4335, #dc2626)",
-                    textDecoration: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    padding: "12px",
-                    fontWeight: 700,
-                    borderRadius: "8px"
-                  }}
-                >
-                  <Mail size={16} />
-                  <span>✉️ Open in Gmail (Send Pre-Filled Email Now)</span>
-                </a>
-              )}
-
-              {createdTeacherInvite.activationUrl && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(createdTeacherInvite.activationUrl);
-                    setStatusBanner({
-                      type: "success",
-                      message: "Activation link copied to clipboard! You can paste it on WhatsApp."
-                    });
-                  }}
-                  className="btn-secondary"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    padding: "11px",
-                    borderColor: "rgba(56, 189, 248, 0.4)",
-                    color: "#38bdf8",
-                    borderRadius: "8px"
-                  }}
-                >
-                  <Copy size={16} />
-                  <span>📋 Copy Direct Activation Link (WhatsApp)</span>
-                </button>
-              )}
-            </div>
-
-            <div style={{ fontSize: "0.78rem", color: "#94a3b8", background: "rgba(56, 189, 248, 0.08)", border: "1px solid rgba(56, 189, 248, 0.2)", borderRadius: "8px", padding: "10px 14px", marginBottom: "18px", lineHeight: "1.5" }}>
-              ⚡ <strong>Zero-Setup Google Sign-In:</strong> Your teacher doesn't even need an email code! They can simply open <span style={{ color: "#38bdf8" }}>https://apex-education-forum.web.app/lms/</span> and click <strong>"Sign In with Google"</strong> using <strong style={{ color: "#fff" }}>{createdTeacherInvite.email}</strong>. The system automatically recognizes their authorized invitation and grants immediate Teacher portal access.
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button
-                type="button"
-                onClick={() => setCreatedTeacherInvite(null)}
-                className="btn-secondary"
-                style={{ padding: "8px 20px" }}
-              >
-                Done
-              </button>
-            </div>
           </div>
         </div>
       )}
