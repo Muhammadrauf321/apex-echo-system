@@ -619,103 +619,7 @@ export default function App() {
         </section>
 
         {/* =========================================================================
-             5. The 3-Tier English Fluency Framework
-             ========================================================================= */}
-        <section id="english-framework" className="py-20 bg-white border-t border-b border-slate-200/80 relative">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center max-w-3xl mx-auto mb-16">
-              <p className="text-xs font-bold text-crimson-600 uppercase tracking-widest mb-2">PEDAGOGICAL FLUENCY ACCELERATION</p>
-              <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">The 3-Tier English Fluency Framework</h2>
-              <p className="mt-3 text-slate-600 text-sm sm:text-base leading-relaxed">
-                Designed specifically for secondary scholars, college candidates, ambitious youth and professionals seeking communicative command locally and globally.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-              {/* Level 1 */}
-              <div className="tilt-container">
-                <div className="tilt-card h-full bg-[#fcfdff] rounded-2xl border border-slate-200 p-7 flex flex-col justify-between shadow-sm hover:border-cobalt-300">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold text-cobalt-700 uppercase tracking-wider">LEVEL 01</span>
-                      <span className="w-8 h-8 rounded-full bg-cobalt-50 border border-cobalt-200 flex items-center justify-center text-xs font-extrabold text-cobalt-700">1</span>
-                    </div>
-                    <h3 className="text-xl font-extrabold text-slate-900 mb-2">Foundation Track</h3>
-                    <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                      Overcomes vernacular hesitation and develops fundamental phonics, sentence construction, essential grammar, and conversational drills.
-                    </p>
-                    <ul className="space-y-3 text-xs text-slate-700 mb-8">
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-cobalt-600 flex-shrink-0 mt-0.5" /><span>Phonics, Sound Articulation &amp; Accent Correction</span></li>
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-cobalt-600 flex-shrink-0 mt-0.5" /><span>Essential Sentence &amp; Tense Structures</span></li>
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-cobalt-600 flex-shrink-0 mt-0.5" /><span>Everyday Situational Vocabulary Acquisition</span></li>
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-cobalt-600 flex-shrink-0 mt-0.5" /><span>Daily Guided Conversational Drills</span></li>
-                    </ul>
-                  </div>
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-500">Duration: 2 Months</span>
-                    <a href="#fast-track-reserve" onClick={() => setSelectedCourseForForm("Foundation Track (Level 01)")} className="font-bold text-cobalt-700 hover:text-cobalt-900">Enrol Level 01 &rarr;</a>
-                  </div>
-                </div>
-              </div>
-
-              {/* Level 2 (Popular) */}
-              <div className="tilt-container">
-                <div className="tilt-card h-full bg-white rounded-2xl border-2 border-cobalt-600 p-7 flex flex-col justify-between shadow-xl relative transform md:-translate-y-2">
-                  <div className="ribbon-popular">MOST ENROLLED TRACK</div>
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold text-crimson-600 uppercase tracking-wider">LEVEL 02</span>
-                      <span className="w-8 h-8 rounded-full bg-red-100 border border-red-200 flex items-center justify-center text-xs font-extrabold text-crimson-600">2</span>
-                    </div>
-                    <h3 className="text-xl font-extrabold text-slate-900 mb-2">Intermediate Track</h3>
-                    <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                      Transformation of active expressive fluency, courtroom-level structured debate, and professional writing and presentation skills.
-                    </p>
-                    <ul className="space-y-3 text-xs text-slate-700 mb-8">
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" /><span>Extempore Speaking &amp; Public Debate Sessions</span></li>
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" /><span>Formal Letter Drafting &amp; Professional Writing</span></li>
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" /><span>Narrative Structure &amp; Audio-Visual Media Analysis</span></li>
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" /><span>Group Discussion Drills &amp; Critical Thinking Workshops</span></li>
-                    </ul>
-                  </div>
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-500">Duration: 2.5 Months</span>
-                    <a href="#fast-track-reserve" onClick={() => setSelectedCourseForForm("Intermediate Track (Level 02)")} className="font-bold text-crimson-600 hover:text-crimson-700">Enrol Level 02 &rarr;</a>
-                  </div>
-                </div>
-              </div>
-
-              {/* Level 3 */}
-              <div className="tilt-container">
-                <div className="tilt-card h-full bg-[#fcfdff] rounded-2xl border border-slate-200 p-7 flex flex-col justify-between shadow-sm hover:border-cobalt-300">
-                  <div>
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-xs font-bold text-cobalt-700 uppercase tracking-wider">LEVEL 03</span>
-                      <span className="w-8 h-8 rounded-full bg-cobalt-50 border border-cobalt-200 flex items-center justify-center text-xs font-extrabold text-cobalt-700">3</span>
-                    </div>
-                    <h3 className="text-xl font-extrabold text-slate-900 mb-2">Advance Proficiency</h3>
-                    <p className="text-xs text-slate-500 leading-relaxed mb-6">
-                      Designed for university admissions, IELTS/TOEFL readiness, CSS/PMS foundation, and high-impact corporate executive articulation.
-                    </p>
-                    <ul className="space-y-3 text-xs text-slate-700 mb-8">
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-cobalt-600 flex-shrink-0 mt-0.5" /><span>Interview Mastery &amp; Executive Q&amp;A Simulation</span></li>
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-cobalt-600 flex-shrink-0 mt-0.5" /><span>Academic Research Papers &amp; Essay Logic</span></li>
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-cobalt-600 flex-shrink-0 mt-0.5" /><span>Advanced Rhetoric &amp; Persuasion Argumentation</span></li>
-                      <li className="flex items-start gap-2"><CheckCircle2 className="w-4 h-4 text-cobalt-600 flex-shrink-0 mt-0.5" /><span>GRE/GAT Test Verbal Reasoning Drills</span></li>
-                    </ul>
-                  </div>
-                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-500">Duration: 2 Months</span>
-                    <a href="#fast-track-reserve" onClick={() => setSelectedCourseForForm("Advance Proficiency (Level 03)")} className="font-bold text-cobalt-700 hover:text-cobalt-900">Enrol Level 03 &rarr;</a>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* =========================================================================
-             6. Institutional Courses & Programs
+             5. Institutional Courses & Programs
              Single Source of Truth: Synchronized Exclusively with Management LMS
              ========================================================================= */}
         <section id="section-courses" className="py-20 bg-[#f9f9ff]">
@@ -770,9 +674,23 @@ export default function App() {
                           )}
 
                           {/* Fee & Duration Pill */}
-                          <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between text-[11px] mb-4">
+                          <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 flex items-center justify-between text-[11px] mb-3">
                             <span className="text-slate-600 font-medium">Fee: <strong>Rs. {Number(course.fee || 0).toLocaleString()}</strong></span>
                             <span className="text-cobalt-700 font-bold">{course.duration || "3 Months"}</span>
+                          </div>
+
+                          {/* Instructor & Class Timing */}
+                          <div className="bg-blue-50/50 rounded-xl p-2.5 border border-blue-100/60 mb-4 text-[11px] space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-500">Instructor:</span>
+                              <span className="font-bold text-cobalt-900">{course.instructorName || "Assigned Faculty"}</span>
+                            </div>
+                            {course.sessionsPerWeek && (
+                              <div className="flex items-center justify-between text-[10.5px]">
+                                <span className="text-slate-500">Class Timings:</span>
+                                <span className="font-semibold text-slate-700">{course.sessionsPerWeek}</span>
+                              </div>
+                            )}
                           </div>
 
                           {/* Modules List */}
@@ -1012,15 +930,15 @@ export default function App() {
                       }}
                       className="w-full px-4 py-3 rounded-xl border border-slate-200 text-xs sm:text-sm focus:ring-2 focus:ring-cobalt-600 focus:border-cobalt-600 outline-none bg-slate-50/50"
                     >
-                      {courses.map(c => (
-                        <option key={c.id} value={c.title}>
-                          {c.title} (Fee: Rs. {Number(c.fee || 0).toLocaleString()})
-                        </option>
-                      ))}
-                      <option value="Foundation Track (Level 01)">Foundation Track (Level 01)</option>
-                      <option value="Intermediate Track (Level 02)">Intermediate Track (Level 02 - Fluency)</option>
-                      <option value="Advance Proficiency (Level 03)">Advance Proficiency (Level 03)</option>
-                      <option value="Sindh Job Portal Registration Desk">Sindh Job Portal Registration Desk</option>
+                      {courses.length === 0 ? (
+                        <option value="">No courses currently scheduled</option>
+                      ) : (
+                        courses.map(c => (
+                          <option key={c.id} value={c.title}>
+                            {c.title} (Fee: Rs. {Number(c.fee || 0).toLocaleString()})
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
                 </div>
@@ -1307,13 +1225,18 @@ export default function App() {
             </div>
 
             <div>
-              <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-4">Academic Tracks</h4>
+              <h4 className="text-white font-bold text-xs uppercase tracking-wider mb-4">Academic Programs</h4>
               <ul className="space-y-2.5 text-xs">
-                <li><a href="#english-framework" className="hover:text-white transition-colors">Foundation English (Level 01)</a></li>
-                <li><a href="#english-framework" className="hover:text-white transition-colors">Intermediate Fluency (Level 02)</a></li>
-                <li><a href="#english-framework" className="hover:text-white transition-colors">Advance Proficiency (Level 03)</a></li>
-                <li><a href="#section-courses" className="hover:text-white transition-colors">STS / Sukkur IBA Screening</a></li>
-                <li><a href="#section-courses" className="hover:text-white transition-colors">Basic Computer Skills &amp; Office</a></li>
+                {courses.length > 0 ? (
+                  courses.slice(0, 5).map(c => (
+                    <li key={c.id}>
+                      <a href="#section-courses" className="hover:text-white transition-colors">{c.title}</a>
+                    </li>
+                  ))
+                ) : (
+                  <li><a href="#section-courses" className="hover:text-white transition-colors">Courses &amp; Programs</a></li>
+                )}
+                <li><a href="#section-courses" className="hover:text-white text-cobalt-400 font-semibold transition-colors">Explore All Programs &rarr;</a></li>
               </ul>
             </div>
 

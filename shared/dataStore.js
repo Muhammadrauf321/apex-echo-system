@@ -11,7 +11,6 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebaseConfig.js";
 import { 
-  SEED_COURSES, 
   SEED_BATCHES, 
   SEED_CERTIFICATES, 
   ADMIN_USER,
@@ -33,12 +32,14 @@ const STORAGE_KEYS = {
   STUDENTS: "apex_students"
 };
 
-// Seed initial storage with 100% clean, fresh real store
+// Seed initial storage with 100% clean, fresh real store (Zero mock data)
 function initLocalData() {
   if (typeof window === "undefined" || typeof localStorage === "undefined") return;
 
-  // Enforce 100% fresh startup purge: removes all old fake batches, exams, teachers, students, AND messages
-  if (localStorage.getItem("apex_fresh_clean_v8") !== "true") {
+  // Enforce 100% fresh startup purge: removes all old fake courses, batches, exams, teachers, students, AND messages
+  if (localStorage.getItem("apex_fresh_clean_v9") !== "true") {
+    localStorage.removeItem(STORAGE_KEYS.COURSES);
+    localStorage.removeItem("apex_courses_initialized");
     localStorage.removeItem(STORAGE_KEYS.BATCHES);
     localStorage.removeItem(STORAGE_KEYS.CERTIFICATES);
     localStorage.removeItem(STORAGE_KEYS.EXAMS);
@@ -46,6 +47,7 @@ function initLocalData() {
     localStorage.removeItem(STORAGE_KEYS.TEACHERS);
     localStorage.removeItem(STORAGE_KEYS.STUDENTS);
     localStorage.removeItem(STORAGE_KEYS.MESSAGES);
+    localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify([]));
@@ -53,14 +55,14 @@ function initLocalData() {
     localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify({}));
-    localStorage.setItem("apex_fresh_clean_v8", "true");
+    localStorage.setItem("apex_fresh_clean_v9", "true");
   }
 
   if (!localStorage.getItem(STORAGE_KEYS.MESSAGES)) {
     localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify({}));
   }
 
-  // Pure zero-mock course store: never inject seed courses if initialized
+  // Pure zero-mock course store: never inject seed courses
   if (!localStorage.getItem("apex_courses_initialized")) {
     if (!localStorage.getItem(STORAGE_KEYS.COURSES)) {
       localStorage.setItem(STORAGE_KEYS.COURSES, JSON.stringify([]));

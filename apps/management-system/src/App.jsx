@@ -93,6 +93,8 @@ export default function App() {
   const [newModuleInput, setNewModuleInput] = useState("");
   const [isCustomCategory, setIsCustomCategory] = useState(false);
   const [customCategoryInput, setCustomCategoryInput] = useState("");
+  const [isCustomInstructor, setIsCustomInstructor] = useState(false);
+  const [customInstructorInput, setCustomInstructorInput] = useState("");
   const [courseForm, setCourseForm] = useState({
     title: "",
     category: "",
@@ -102,6 +104,8 @@ export default function App() {
     fee: 25000,
     installments: 2,
     level: "Beginner to Advanced",
+    instructorName: "To be assigned",
+    instructorRole: "Faculty Instructor",
     badge: "New Course",
     prerequisites: "Basic literacy and logical thinking",
     modules: [
@@ -297,6 +301,8 @@ export default function App() {
     setEditingCourse(null);
     setIsCustomCategory(false);
     setCustomCategoryInput("");
+    setIsCustomInstructor(false);
+    setCustomInstructorInput("");
     setCourseForm({
       title: "",
       category: "",
@@ -306,6 +312,8 @@ export default function App() {
       fee: 25000,
       installments: 2,
       level: "Beginner to Advanced",
+      instructorName: teachers[0]?.name || "To be assigned",
+      instructorRole: "Faculty Instructor",
       badge: "New Course",
       prerequisites: "Basic literacy and logical thinking",
       modules: [
@@ -322,6 +330,15 @@ export default function App() {
     setEditingCourse(course);
     setIsCustomCategory(false);
     setCustomCategoryInput("");
+    const isTeacherInList = teachers.some(t => t.name === course.instructorName);
+    const isTBA = !course.instructorName || course.instructorName === "To be assigned";
+    if (!isTeacherInList && !isTBA && course.instructorName) {
+      setIsCustomInstructor(true);
+      setCustomInstructorInput(course.instructorName);
+    } else {
+      setIsCustomInstructor(false);
+      setCustomInstructorInput("");
+    }
     setCourseForm({
       title: course.title || "",
       category: course.category || "",
@@ -331,6 +348,8 @@ export default function App() {
       fee: course.fee || 20000,
       installments: course.installments || 2,
       level: course.level || "Beginner to Advanced",
+      instructorName: course.instructorName || "To be assigned",
+      instructorRole: course.instructorRole || "Faculty Instructor",
       badge: course.badge || "New Course",
       prerequisites: course.prerequisites || "",
       modules: course.modules && course.modules.length > 0 ? [...course.modules] : [
@@ -360,6 +379,7 @@ export default function App() {
   const handleSaveCourseSubmit = async (e) => {
     e.preventDefault();
     const finalCategory = (isCustomCategory ? customCategoryInput : courseForm.category).trim();
+    const finalInstructor = (isCustomInstructor ? customInstructorInput : courseForm.instructorName || "To be assigned").trim();
 
     if (!courseForm.title.trim()) {
       alert("Please enter a course title.");
@@ -373,6 +393,7 @@ export default function App() {
     const payload = {
       ...courseForm,
       category: finalCategory,
+      instructorName: finalInstructor || "To be assigned",
       fee: Number(courseForm.fee),
       installments: Number(courseForm.installments)
     };
@@ -1425,13 +1446,15 @@ export default function App() {
                           </div>
 
                           <div>
-                            <span style={{ color: "var(--text-dim)", display: "block", fontSize: "0.72rem" }}>Level</span>
-                            <span style={{ color: "#38bdf8", fontWeight: 600 }}>{c.level || "All Levels"}</span>
+                            <span style={{ color: "var(--text-dim)", display: "block", fontSize: "0.72rem" }}>Instructor</span>
+                            <strong style={{ color: "#fbcfe8", fontSize: "0.85rem" }}>{c.instructorName || "To be assigned"}</strong>
+                            <div style={{ fontSize: "0.7rem", color: "var(--text-dim)" }}>{c.instructorRole || "Faculty"}</div>
                           </div>
 
                           <div>
-                            <span style={{ color: "var(--text-dim)", display: "block", fontSize: "0.72rem" }}>Modules</span>
-                            <span style={{ color: "#a5b4fc", fontWeight: 600 }}>{c.modules?.length || 0} Core Topics</span>
+                            <span style={{ color: "var(--text-dim)", display: "block", fontSize: "0.72rem" }}>Level &amp; Syllabus</span>
+                            <span style={{ color: "#38bdf8", fontWeight: 600 }}>{c.level || "All Levels"}</span>
+                            <div style={{ fontSize: "0.7rem", color: "#a5b4fc" }}>{c.modules?.length || 0} Core Topics</div>
                           </div>
                         </div>
 
@@ -2861,6 +2884,78 @@ export default function App() {
                 />
               </div>
 
+              {/* Assigned Faculty Instructor & Role */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                    <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600 }}>Assigned Instructor</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomInstructor(!isCustomInstructor);
+                        if (!isCustomInstructor) setCustomInstructorInput("");
+                      }}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#818cf8",
+                        fontSize: "0.75rem",
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        padding: 0
+                      }}
+                    >
+                      {isCustomInstructor ? "← Pick from Faculty" : "+ Custom Name"}
+                    </button>
+                  </div>
+
+                  {isCustomInstructor ? (
+                    <input
+                      type="text"
+                      placeholder="e.g. Sir Ali Raza, Madam Sara..."
+                      value={customInstructorInput}
+                      onChange={(e) => {
+                        setCustomInstructorInput(e.target.value);
+                        setCourseForm({ ...courseForm, instructorName: e.target.value });
+                      }}
+                      style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid #6366f1", borderRadius: "8px", color: "#ffffff" }}
+                    />
+                  ) : (
+                    <select
+                      value={courseForm.instructorName}
+                      onChange={(e) => {
+                        if (e.target.value === "__CUSTOM__") {
+                          setIsCustomInstructor(true);
+                          setCustomInstructorInput("");
+                        } else {
+                          setCourseForm({ ...courseForm, instructorName: e.target.value });
+                        }
+                      }}
+                      style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                    >
+                      <option value="To be assigned">To be assigned (TBA)</option>
+                      {teachers.map(t => (
+                        <option key={t.id || t.email} value={t.name}>
+                          {t.name} ({t.department || "Faculty"})
+                        </option>
+                      ))}
+                      <option value="__CUSTOM__">+ Enter Other / Custom Name...</option>
+                    </select>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Instructor Designation</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Senior Faculty Instructor"
+                    value={courseForm.instructorRole}
+                    onChange={(e) => setCourseForm({ ...courseForm, instructorRole: e.target.value })}
+                    style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                  />
+                </div>
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Tuition Fee (PKR) *</label>
@@ -2903,7 +2998,7 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Class Schedule / Weekly *</label>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: "4px" }}>Class Days &amp; Timings *</label>
                   <input
                     type="text"
                     required
