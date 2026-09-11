@@ -131,6 +131,11 @@ export function saveRegisteredAccount(account) {
   safeStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
 }
 
+// Save accounts array
+export function saveRegisteredAccounts(accounts) {
+  safeStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
+}
+
 // Current User management - strictly synced via cross-port cookie (ZERO AUTO-LOGIN)
 export function getCurrentUser() {
   if (typeof window === "undefined") return null;
