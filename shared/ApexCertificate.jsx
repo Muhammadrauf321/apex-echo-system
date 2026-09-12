@@ -1,17 +1,22 @@
 import React from "react";
+import certLogoImg from "./assets/apex_logo.png";
+import certBgImg from "./assets/cert_bg.png";
+import certCornerTLImg from "./assets/cert_corner_top_left.png";
+import certCornerBRImg from "./assets/cert_corner_bottom_right.png";
+import certCornerTrianglesImg from "./assets/cert_corner_triangles.png";
 
 /**
- * ApexCertificate - High-Fidelity Official Institutional Certificate
- * Replicates the exact Apex Education Forum official certificate design with:
- * - Dynamic layered angular blue & cyan vector geometric corner graphics
- * - Official Apex Education Forum circular emblem badge
- * - "CERTIFICATE" classical serif title
- * - "This is to certify that" subtitle
- * - Student name & parentage in calligraphic cursive typography ('Great Vibes')
- * - Program completion statement with highlighted duration in red & course in deep navy
+ * ApexCertificate - Official Institutional Accredited Certificate
+ * Pixel-accurate production implementation using official Apex high-resolution vector assets:
+ * - Official white/grey geometric textured background (certBgImg)
+ * - Official top-left angular blue/cyan banner with speed lines (certCornerTLImg)
+ * - Official bottom-right angular blue/cyan banner with speed lines (certCornerBRImg)
+ * - Official top-right & bottom-left geometric triangular chevrons (certCornerTrianglesImg)
+ * - Official Apex Education Forum circular crest logo (certLogoImg)
+ * - Classical Cinzel & Playfair Display serif typography
+ * - Dynamic cursive candidate calligraphy (Great Vibes)
  * - Dynamically bound Director Name from the Management System
- * - Official reference serial & date
- * - Edge-to-edge @media print support for A4 Landscape
+ * - Flawless borderless A4 landscape print styling
  */
 export default function ApexCertificate({
   studentName = "Amjad Ali s/o Kabil",
@@ -28,144 +33,290 @@ export default function ApexCertificate({
   className = ""
 }) {
   return (
-    <div className={`apex-cert-wrapper ${className}`} style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+    <div className={`apex-cert-wrapper ${className}`}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Great+Vibes&family=Playfair+Display:ital,wght@0,600;0,700;1,400&family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Great+Vibes&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@400;500;600;700&display=swap');
+
+        .apex-cert-wrapper {
+          width: 100%;
+          display: flex;
+          justifyContent: center;
+          align-items: center;
+          padding: 10px 0;
+          box-sizing: border-box;
+          overflow: hidden;
+        }
 
         .apex-cert-frame {
           position: relative;
           width: 1000px;
-          min-height: 700px;
-          aspect-ratio: 1.414 / 1;
-          background: #ffffff;
+          height: 707px;
+          max-width: 1000px;
+          aspect-ratio: 1.4142 / 1;
+          background-color: #ffffff;
           color: #0f172a;
           box-sizing: border-box;
           overflow: hidden;
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
           font-family: 'Inter', sans-serif;
           user-select: none;
+          -webkit-font-smoothing: antialiased;
         }
 
-        .apex-cert-watermark {
+        /* 1. Official Textured Geometric Watermark Background */
+        .apex-cert-bg-layer {
           position: absolute;
           inset: 0;
-          background-image: 
-            radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.03) 0%, transparent 70%),
-            linear-gradient(135deg, rgba(15, 23, 42, 0.01) 25%, transparent 25%),
-            linear-gradient(225deg, rgba(15, 23, 42, 0.01) 25%, transparent 25%),
-            linear-gradient(45deg, rgba(15, 23, 42, 0.01) 25%, transparent 25%),
-            linear-gradient(315deg, rgba(15, 23, 42, 0.01) 25%, transparent 25%);
-          background-size: 100% 100%, 30px 30px, 30px 30px, 30px 30px, 30px 30px;
+          background-image: url(${certBgImg});
+          background-position: center center;
+          background-size: cover;
+          background-repeat: no-repeat;
+          opacity: 0.92;
           pointer-events: none;
           z-index: 1;
         }
 
+        /* 2. Official Corner Vector Elements */
+        .apex-corner-top-left {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 470px;
+          height: auto;
+          pointer-events: none;
+          user-select: none;
+          z-index: 3;
+        }
+
+        .apex-corner-bottom-right {
+          position: absolute;
+          bottom: 0;
+          right: 0;
+          width: 485px;
+          height: auto;
+          pointer-events: none;
+          user-select: none;
+          z-index: 3;
+        }
+
+        .apex-corner-bottom-left {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          width: 250px;
+          height: auto;
+          pointer-events: none;
+          user-select: none;
+          z-index: 2;
+        }
+
+        .apex-corner-top-right {
+          position: absolute;
+          top: 0;
+          right: 0;
+          width: 250px;
+          height: auto;
+          pointer-events: none;
+          user-select: none;
+          z-index: 2;
+          transform: rotate(180deg);
+        }
+
+        /* 3. Certificate Core Content Container */
         .apex-cert-content {
           position: relative;
           z-index: 10;
+          width: 100%;
           height: 100%;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          padding: 36px 60px 40px 60px;
+          padding: 28px 75px 32px 75px;
           box-sizing: border-box;
+        }
+
+        /* Header Row: Dated, Crest, Roll No */
+        .apex-cert-header-row {
+          display: flex;
+          justifyContent: space-between;
+          align-items: flex-start;
+          width: 100%;
+        }
+
+        .apex-cert-meta-dated {
+          font-family: 'Inter', sans-serif;
+          font-size: 0.92rem;
+          color: #1e293b;
+          font-weight: 500;
+          padding-top: 52px;
+          min-width: 190px;
+        }
+
+        .apex-cert-logo-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          margin-top: -6px;
+        }
+
+        .apex-cert-crest-img {
+          width: 120px;
+          height: 120px;
+          object-fit: contain;
+          filter: drop-shadow(0 5px 14px rgba(0, 0, 0, 0.12));
+        }
+
+        .apex-cert-meta-roll {
+          font-family: 'Inter', sans-serif;
+          font-size: 0.92rem;
+          color: #1e293b;
+          font-weight: 600;
+          text-align: right;
+          padding-top: 52px;
+          min-width: 190px;
+          letter-spacing: 0.02em;
+        }
+
+        /* Typography Main Body */
+        .apex-cert-body {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          margin-top: -10px;
         }
 
         .apex-cert-title {
           font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
-          font-weight: 800;
-          letter-spacing: 0.18em;
-          color: #0b2545;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          color: #0b347b;
           text-transform: uppercase;
-          text-align: center;
-          font-size: 2.85rem;
-          margin: 0;
-          line-height: 1.1;
+          font-size: 3.3rem;
+          margin: 0 0 6px 0;
+          line-height: 1.05;
         }
 
         .apex-cert-sub {
-          font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
+          font-family: 'Playfair Display', Georgia, serif;
           font-weight: 600;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.02em;
           color: #1e293b;
-          text-align: center;
-          font-size: 1.25rem;
-          margin-top: 10px;
-          margin-bottom: 0;
+          font-size: 1.45rem;
+          margin: 0 0 6px 0;
+          line-height: 1.2;
         }
 
         .apex-cert-candidate {
-          font-family: 'Great Vibes', 'Allura', cursive;
-          font-size: 3.5rem;
-          color: #004b99;
-          text-align: center;
-          margin: 14px 0 6px 0;
-          line-height: 1.2;
-          font-weight: 500;
-          text-shadow: 0 1px 1px rgba(0,0,0,0.05);
+          font-family: 'Great Vibes', cursive;
+          font-size: 3.9rem;
+          color: #0047ab;
+          line-height: 1.18;
+          margin: 2px 0 10px 0;
+          max-width: 820px;
+          word-break: break-word;
+          text-shadow: 0 1px 2px rgba(0, 71, 171, 0.12);
         }
 
-        .apex-cert-desc {
-          text-align: center;
-          font-size: 1.05rem;
-          color: #1e293b;
+        .apex-cert-completion {
           font-family: 'Playfair Display', Georgia, serif;
-          margin: 0;
-          line-height: 1.5;
+          font-size: 1.15rem;
+          color: #1e293b;
+          margin: 0 0 5px 0;
+          font-weight: 500;
         }
 
         .apex-cert-duration {
-          color: #c52227;
-          font-weight: 800;
+          color: #d90429;
+          font-weight: 700;
           font-family: 'Playfair Display', Georgia, serif;
         }
 
         .apex-cert-course {
-          text-align: center;
           font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
           font-weight: 800;
-          font-size: 1.55rem;
-          color: #002b5c;
-          margin-top: 4px;
-          letter-spacing: 0.04em;
+          font-size: 1.45rem;
+          color: #0a2558;
+          letter-spacing: 0.05em;
+          margin: 0;
+        }
+
+        /* Footer Row: Certificate Serial & Dynamic Director */
+        .apex-cert-footer-row {
+          display: flex;
+          justifyContent: space-between;
+          align-items: flex-end;
+          width: 100%;
+          padding-bottom: 8px;
+        }
+
+        .apex-cert-serial {
+          font-family: 'Inter', sans-serif;
+          font-size: 0.84rem;
+          color: #334155;
+          min-width: 220px;
+        }
+
+        .apex-cert-director-block {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          position: relative;
+          min-width: 240px;
+          margin-right: 90px;
+        }
+
+        /* Decorative diagonal flourish line behind Director authority */
+        .apex-cert-director-line {
+          position: absolute;
+          top: 14px;
+          width: 180px;
+          height: 1.5px;
+          background: linear-gradient(90deg, transparent, #38bdf8, #0047ab, transparent);
+          transform: rotate(-3deg);
+          pointer-events: none;
         }
 
         .apex-cert-director-name {
-          font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
-          font-weight: 800;
-          font-size: 1.05rem;
+          font-family: 'Playfair Display', Georgia, serif;
+          font-weight: 700;
+          font-size: 1.18rem;
           color: #0f172a;
-          margin-bottom: 2px;
-          letter-spacing: 0.05em;
+          margin-bottom: 1px;
+          position: relative;
+          z-index: 2;
+          letter-spacing: 0.02em;
         }
 
         .apex-cert-director-title {
           font-family: 'Playfair Display', Georgia, serif;
-          font-size: 0.88rem;
-          color: #475569;
-          font-style: italic;
+          font-size: 0.95rem;
+          color: #334155;
+          position: relative;
+          z-index: 2;
         }
 
-        /* High-Definition Print Styles */
+        /* High-Precision Borderless Print Rules */
         @media print {
           body * {
-            visibility: hidden;
+            visibility: hidden !important;
           }
           .apex-cert-frame, .apex-cert-frame * {
-            visibility: visible;
+            visibility: visible !important;
           }
           .apex-cert-frame {
-            position: fixed;
-            left: 0;
-            top: 0;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
             width: 100vw !important;
             height: 100vh !important;
+            max-width: none !important;
             box-shadow: none !important;
             border-radius: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
           @page {
             size: A4 landscape;
@@ -174,219 +325,102 @@ export default function ApexCertificate({
         }
       `}</style>
 
+      {/* Main Certificate Frame (Standard A4 Landscape Aspect Ratio 1.4142 : 1) */}
       <div className="apex-cert-frame">
-        {/* Subtle Paper Texture Background */}
-        <div className="apex-cert-watermark" />
+        {/* Layer 1: Textured Geometric Background Pattern */}
+        <div className="apex-cert-bg-layer" />
 
-        {/* =================================================================== */}
-        {/* 1. TOP-LEFT GEOMETRIC CORNER OVERLAY                                */}
-        {/* =================================================================== */}
-        <svg
-          style={{ position: "absolute", top: 0, left: 0, width: "360px", height: "260px", zIndex: 3, pointerEvents: "none" }}
-          viewBox="0 0 360 260"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/* Faint accent wedge */}
-          <polygon points="0,0 260,0 0,160" fill="rgba(2, 132, 199, 0.15)" />
-          
-          {/* Main Dark Navy Outer Block */}
-          <polygon points="0,0 210,0 60,190 0,190" fill="#091b36" />
-          
-          {/* Layered Cobalt Blue Polygon */}
-          <polygon points="0,0 160,0 35,175 0,140" fill="#0047AB" />
-          
-          {/* Electric Cyan Sharp Slash */}
-          <polygon points="75,0 125,0 15,155 0,155" fill="#00d2ff" />
-          
-          {/* Trailing angled Speed Stripes */}
-          <polygon points="175,0 195,0 115,115 105,115" fill="#0284c7" />
-          <polygon points="215,0 230,0 145,115 137,115" fill="#38bdf8" />
-          <line x1="120" y1="0" x2="20" y2="135" stroke="#ffffff" strokeWidth="2.5" opacity="0.6" />
-          <line x1="140" y1="0" x2="45" y2="130" stroke="#00d2ff" strokeWidth="2" opacity="0.8" />
-          <line x1="245" y1="0" x2="160" y2="110" stroke="#0284c7" strokeWidth="2" opacity="0.5" />
-          <line x1="265" y1="0" x2="185" y2="105" stroke="#38bdf8" strokeWidth="1.5" opacity="0.4" />
-        </svg>
+        {/* Layer 2: Official Vector Corner Elements */}
+        {/* Top-Left Banner Graphic */}
+        <img
+          src={certCornerTLImg}
+          alt=""
+          aria-hidden="true"
+          className="apex-corner-top-left"
+        />
 
-        {/* =================================================================== */}
-        {/* 2. TOP-RIGHT GEOMETRIC CORNER OVERLAY                               */}
-        {/* =================================================================== */}
-        <svg
-          style={{ position: "absolute", top: 0, right: 0, width: "380px", height: "260px", zIndex: 3, pointerEvents: "none" }}
-          viewBox="0 0 380 260"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/* Faint accent backdrop */}
-          <polygon points="380,0 120,0 380,180" fill="rgba(2, 132, 199, 0.12)" />
+        {/* Bottom-Right Banner Graphic */}
+        <img
+          src={certCornerBRImg}
+          alt=""
+          aria-hidden="true"
+          className="apex-corner-bottom-right"
+        />
 
-          {/* Deep Navy Polygonal Cap */}
-          <polygon points="380,0 170,0 320,195 380,195" fill="#091b36" />
+        {/* Bottom-Left Geometric Triangles */}
+        <img
+          src={certCornerTrianglesImg}
+          alt=""
+          aria-hidden="true"
+          className="apex-corner-bottom-left"
+        />
 
-          {/* Royal Cobalt Wedge */}
-          <polygon points="380,0 215,0 345,175 380,140" fill="#0047AB" />
+        {/* Top-Right Geometric Triangles (180deg symmetric) */}
+        <img
+          src={certCornerTrianglesImg}
+          alt=""
+          aria-hidden="true"
+          className="apex-corner-top-right"
+        />
 
-          {/* Bright Electric Cyan Slash */}
-          <polygon points="305,0 255,0 365,150 380,150" fill="#00d2ff" />
-
-          {/* Speed Stripes */}
-          <polygon points="205,0 190,0 270,110 280,110" fill="#0284c7" />
-          <polygon points="165,0 150,0 240,110 248,110" fill="#38bdf8" />
-          <line x1="260" y1="0" x2="360" y2="135" stroke="#ffffff" strokeWidth="2.5" opacity="0.6" />
-          <line x1="240" y1="0" x2="335" y2="130" stroke="#00d2ff" strokeWidth="2" opacity="0.8" />
-          <line x1="135" y1="0" x2="220" y2="110" stroke="#0284c7" strokeWidth="2" opacity="0.5" />
-          <line x1="115" y1="0" x2="195" y2="105" stroke="#38bdf8" strokeWidth="1.5" opacity="0.4" />
-        </svg>
-
-        {/* =================================================================== */}
-        {/* 3. BOTTOM-LEFT GEOMETRIC CORNER OVERLAY                             */}
-        {/* =================================================================== */}
-        <svg
-          style={{ position: "absolute", bottom: 0, left: 0, width: "360px", height: "240px", zIndex: 3, pointerEvents: "none" }}
-          viewBox="0 0 360 240"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/* Bottom Left Accent Triangles */}
-          <polygon points="0,240 220,240 0,90" fill="rgba(2, 132, 199, 0.12)" />
-          <polygon points="0,240 180,240 40,80 0,80" fill="#091b36" />
-          <polygon points="0,240 135,240 20,105 0,125" fill="#0047AB" />
-          <polygon points="50,240 95,240 0,110 0,95" fill="#00d2ff" />
-          <line x1="110" y1="240" x2="15" y2="120" stroke="#0284c7" strokeWidth="2" opacity="0.6" />
-          <line x1="150" y1="240" x2="55" y2="120" stroke="#38bdf8" strokeWidth="1.5" opacity="0.4" />
-          <line x1="200" y1="240" x2="110" y2="130" stroke="#00d2ff" strokeWidth="2" opacity="0.5" />
-        </svg>
-
-        {/* =================================================================== */}
-        {/* 4. BOTTOM-RIGHT GEOMETRIC CORNER OVERLAY                            */}
-        {/* =================================================================== */}
-        <svg
-          style={{ position: "absolute", bottom: 0, right: 0, width: "420px", height: "280px", zIndex: 3, pointerEvents: "none" }}
-          viewBox="0 0 420 280"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          {/* Deep Navy Main Block */}
-          <polygon points="420,280 140,280 340,50 420,50" fill="#091b36" />
-          {/* Layered Royal Cobalt */}
-          <polygon points="420,280 190,280 365,75 420,115" fill="#0047AB" />
-          {/* Electric Cyan Stripe */}
-          <polygon points="340,280 290,280 395,115 420,115" fill="#00d2ff" />
-          {/* Speed accent lines */}
-          <polygon points="260,280 245,280 340,150 350,150" fill="#0284c7" />
-          <polygon points="215,280 200,280 295,150 305,150" fill="#38bdf8" />
-          <line x1="280" y1="280" x2="385" y2="130" stroke="#ffffff" strokeWidth="2.5" opacity="0.6" />
-          <line x1="250" y1="280" x2="355" y2="130" stroke="#00d2ff" strokeWidth="2" opacity="0.8" />
-          <line x1="175" y1="280" x2="270" y2="150" stroke="#0284c7" strokeWidth="2" opacity="0.5" />
-          <line x1="145" y1="280" x2="240" y2="150" stroke="#38bdf8" strokeWidth="1.5" opacity="0.4" />
-        </svg>
-
-        {/* =================================================================== */}
-        {/* CERTIFICATE CORE CONTENT                                            */}
-        {/* =================================================================== */}
+        {/* Layer 3: Official Certificate Core Content */}
         <div className="apex-cert-content">
           
-          {/* Header Bar: Dated (Left), Logo Badge (Center), Serial (Right) */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", width: "100%" }}>
-            
-            {/* Left: Dated */}
-            <div style={{ textAlign: "left", paddingTop: "12px" }}>
-              <span style={{ fontSize: "0.86rem", color: "#1e293b", fontFamily: "'Inter', sans-serif" }}>
-                <strong>Dated:</strong> &nbsp;&nbsp;{issueDate || "September 2024"}
-              </span>
+          {/* Header Row: Dated, Crest Emblem, Candidate Roll No */}
+          <div className="apex-cert-header-row">
+            {/* Left: Issue Date */}
+            <div className="apex-cert-meta-dated">
+              <span>Dated:</span> &nbsp;
+              <strong>{issueDate || "September 2024"}</strong>
             </div>
 
-            {/* Center: Apex Education Forum Emblem Badge */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt="Apex Education Forum Logo"
-                  style={{ width: "96px", height: "96px", objectFit: "contain" }}
-                />
-              ) : (
-                /* High-Definition Vector Reproduction of Apex Logo Emblem */
-                <div style={{
-                  width: "92px",
-                  height: "92px",
-                  borderRadius: "50%",
-                  background: "#ffffff",
-                  boxShadow: "0 4px 14px rgba(0, 0, 0, 0.1)",
-                  border: "2px solid #0056b3",
-                  position: "relative",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "6px"
-                }}>
-                  {/* Decorative circular inner border with red & blue arcs */}
-                  <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} viewBox="0 0 100 100">
-                    <circle cx="50" cy="50" r="46" fill="none" stroke="#e2e8f0" strokeWidth="1" />
-                    <path d="M 20,26 A 44,44 0 0,1 80,26" fill="none" stroke="#d90429" strokeWidth="2.2" strokeLinecap="round" />
-                    <path d="M 80,74 A 44,44 0 0,1 20,74" fill="none" stroke="#0056b3" strokeWidth="2.2" strokeLinecap="round" />
-                  </svg>
-
-                  {/* Apex Stylized Title with Nib/Pen */}
-                  <div style={{ display: "flex", alignItems: "baseline", gap: "1px", position: "relative", zIndex: 2, marginTop: "-4px" }}>
-                    <span style={{ fontSize: "1.35rem", fontWeight: 900, color: "#d90429", fontFamily: "'Montserrat', sans-serif", letterSpacing: "-0.05em" }}>A</span>
-                    <span style={{ fontSize: "1.1rem", fontWeight: 800, color: "#0056b3", fontFamily: "'Montserrat', sans-serif" }}>PEX</span>
-                    {/* Feather / Pen tip icon */}
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d90429" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: "2px", transform: "rotate(45deg)" }}>
-                      <path d="m12 19 7-7 3 3-7 7-3-3z" />
-                      <path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-                      <path d="m2 2 7.586 7.586" />
-                      <circle cx="11" cy="11" r="2" />
-                    </svg>
-                  </div>
-
-                  {/* Subtitle EDUCATION FORUM */}
-                  <div style={{
-                    fontSize: "0.42rem",
-                    fontWeight: 800,
-                    color: "#0f172a",
-                    letterSpacing: "0.14em",
-                    fontFamily: "'Montserrat', sans-serif",
-                    marginTop: "1px",
-                    textTransform: "uppercase"
-                  }}>
-                    EDUCATION FORUM
-                  </div>
-                </div>
-              )}
+            {/* Center: Official High-Res Apex Education Forum Crest */}
+            <div className="apex-cert-logo-container">
+              <img
+                src={logoUrl || certLogoImg}
+                alt="Apex Education Forum Crest"
+                className="apex-cert-crest-img"
+              />
             </div>
 
-            {/* Right: Reference Roll No */}
-            <div style={{ textAlign: "right", paddingTop: "12px" }}>
-              <span style={{ fontSize: "0.86rem", color: "#1e293b", fontFamily: "'Inter', sans-serif" }}>
-                <strong>{rollNumber || "AEF-217/2024"}</strong>
-              </span>
+            {/* Right: Roll Number */}
+            <div className="apex-cert-meta-roll">
+              <span>{rollNumber || "AEF-217/2024"}</span>
             </div>
           </div>
 
-          {/* Main Typography Section */}
-          <div style={{ margin: "20px 0 10px 0" }}>
+          {/* Central Body Typography */}
+          <div className="apex-cert-body">
             <h1 className="apex-cert-title">CERTIFICATE</h1>
-            <p className="apex-cert-sub">This is to certify that</p>
-            <div className="apex-cert-candidate">{studentName || "Candidate Name"}</div>
+            <h2 className="apex-cert-sub">This is to certify that</h2>
             
-            <p className="apex-cert-desc">
+            {/* Candidate Name in Official Calligraphic Script */}
+            <div className="apex-cert-candidate">
+              {studentName || "Amjad Ali s/o Kabil"}
+            </div>
+
+            {/* Program Completion Statement with Highlighted Red Duration */}
+            <p className="apex-cert-completion">
               Successfully completed the <span className="apex-cert-duration">{duration || "Six Months"}</span>
             </p>
-            <div className="apex-cert-course">{courseTitle || "Professional Program"}</div>
+
+            {/* Course Title in Classical Bold Serif */}
+            <div className="apex-cert-course">
+              {courseTitle || "Basic Computer Course"}
+            </div>
           </div>
 
-          {/* Footer: Certificate Serial (Left) & Director Signature (Center) */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", width: "100%", paddingBottom: "10px" }}>
-            
-            {/* Left: Certificate No. */}
-            <div style={{ textAlign: "left", fontSize: "0.78rem", color: "#64748b", fontFamily: "'Inter', sans-serif" }}>
-              <div>Certificate No: <strong style={{ color: "#0f172a" }}>{certificateNumber || "aef / 2026"}</strong></div>
-              <div style={{ fontSize: "0.68rem", color: "#94a3b8", marginTop: "2px" }}>Verified Institutional Credential</div>
+          {/* Footer Row: Certificate No (Left) & Dynamic Director (Center-Right) */}
+          <div className="apex-cert-footer-row">
+            {/* Left: Certificate Serial */}
+            <div className="apex-cert-serial">
+              <span>Certificate No </span>
+              <strong>{certificateNumber || "aef /2026"}</strong>
             </div>
 
-            {/* Center/Right-Center: Director Signature & Dynamic Name */}
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: "220px", marginRight: "110px" }}>
+            {/* Center: Dynamic Director Authority from Management System */}
+            <div className="apex-cert-director-block">
+              {/* Optional physical signature scan/stamp image */}
               {signatureUrl ? (
                 <img
                   src={signatureUrl}
@@ -394,41 +428,22 @@ export default function ApexCertificate({
                   style={{ height: "42px", objectFit: "contain", marginBottom: "4px" }}
                 />
               ) : (
-                /* Elegant Digital Signature flourish */
-                <svg width="150" height="34" viewBox="0 0 150 34" fill="none" style={{ marginBottom: "2px" }}>
-                  <path
-                    d="M 10 24 Q 40 8, 70 20 T 110 12 Q 130 18, 145 10"
-                    stroke="#0047AB"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                  <path
-                    d="M 35 15 Q 45 4, 60 14 Q 75 26, 95 18"
-                    stroke="#0047AB"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    fill="none"
-                  />
-                </svg>
+                <div className="apex-cert-director-line" />
               )}
 
-              {/* Dynamic Director Name from Management System */}
+              {/* Dynamically bound Director Name from Management System */}
               <div className="apex-cert-director-name">
                 {directorName || "Yasir Ali"}
               </div>
 
-              {/* Title */}
+              {/* Designation / Title */}
               <div className="apex-cert-director-title">
                 {directorTitle || "Director"}
               </div>
-
-              {/* Signature underline */}
-              <div style={{ width: "160px", height: "1.5px", background: "linear-gradient(90deg, transparent, #0056b3, transparent)", marginTop: "4px" }} />
             </div>
 
-            {/* Right Spacer to balance Certificate No */}
-            <div style={{ width: "80px" }} />
+            {/* Balance Spacer */}
+            <div style={{ width: "90px" }} />
           </div>
 
         </div>
