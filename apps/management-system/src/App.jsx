@@ -3039,7 +3039,7 @@ Apex Education Forum`;
                 </div>
 
                 <div className="glass-panel" style={{ padding: "12px", background: "#050811", borderRadius: "12px", overflow: "hidden", minHeight: "410px" }}>
-                  <div style={{ transform: "scale(0.56)", transformOrigin: "top left", width: "1000px", height: "700px", marginBottom: "-305px" }}>
+                  <div style={{ transform: "scale(0.65)", transformOrigin: "top left", width: "792px", height: "612px", marginBottom: "-200px" }}>
                     <ApexCertificate
                       studentName={certForm.studentName}
                       courseTitle={certForm.courseTitle}
@@ -3047,7 +3047,7 @@ Apex Education Forum`;
                       issueDate={certForm.issueDate}
                       rollNumber={certForm.rollNumber}
                       certificateNumber={certForm.certificateNumber}
-                      directorName={directorProfile?.name || "Engr. Muhammad Rauf"}
+                      directorName={directorProfile?.name || "Yasir Ali"}
                       directorTitle={directorProfile?.title || "Director"}
                     />
                   </div>

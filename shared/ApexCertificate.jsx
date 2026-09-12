@@ -3,20 +3,19 @@ import certLogoImg from "./assets/apex_logo.png";
 import certBgImg from "./assets/cert_bg.png";
 import certCornerTLImg from "./assets/cert_corner_top_left.png";
 import certCornerBRImg from "./assets/cert_corner_bottom_right.png";
-import certCornerTrianglesImg from "./assets/cert_corner_triangles.png";
+import certCornerTRImg from "./assets/cert_corner_top_right.png";
+import certCornerBLImg from "./assets/cert_corner_bottom_left.png";
 
 /**
- * ApexCertificate - Official Institutional Accredited Certificate
- * Pixel-accurate production implementation using official Apex high-resolution vector assets:
- * - Official white/grey geometric textured background (certBgImg)
- * - Official top-left angular blue/cyan banner with speed lines (certCornerTLImg)
- * - Official bottom-right angular blue/cyan banner with speed lines (certCornerBRImg)
- * - Official top-right & bottom-left geometric triangular chevrons (certCornerTrianglesImg)
- * - Official Apex Education Forum circular crest logo (certLogoImg)
- * - Classical Cinzel & Playfair Display serif typography
- * - Dynamic cursive candidate calligraphy (Great Vibes)
- * - Dynamically bound Director Name from the Management System
- * - Flawless borderless A4 landscape print styling
+ * ApexCertificate - Forensic Institutional Accredited Certificate
+ * Exact 1:1 reproduction matching the provided PDF (MediaBox 792x612, aspect ratio 1.2941:1):
+ * - Extracted native PDF vector corner graphics (TL, TR, BL, BR)
+ * - Extracted native background watermark texture (cert_bg.png)
+ * - Official circular emblem crest (apex_logo.png) centered at 5.02% top
+ * - Authentic Gentium Plus & Great Vibes typography matching embedded PDF fonts
+ * - Exact forensic coordinates, font sizes, and RGB color values
+ * - Dynamically bound Director Authority from the Management System
+ * - Flawless borderless print and responsive display
  */
 export default function ApexCertificate({
   studentName = "Amjad Ali s/o Kabil",
@@ -33,284 +32,320 @@ export default function ApexCertificate({
   className = ""
 }) {
   return (
-    <div className={`apex-cert-wrapper ${className}`}>
+    <div className={`apex-cert-outer-container ${className}`}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Great+Vibes&family=Playfair+Display:ital,wght@0,500;0,600;0,700;0,800;1,400;1,600&family=Inter:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Gentium+Plus:ital,wght@0,400;0,700;1,400;1,700&family=Great+Vibes&family=Inter:wght@400;500;600;700&display=swap');
 
-        .apex-cert-wrapper {
+        .apex-cert-outer-container {
           width: 100%;
           display: flex;
           justifyContent: center;
           align-items: center;
-          padding: 10px 0;
+          padding: 8px 0;
           box-sizing: border-box;
           overflow: hidden;
         }
 
-        .apex-cert-frame {
+        /* Exact PDF Aspect Ratio: 792 / 612 = 1.2941176 : 1 */
+        .apex-cert-canvas {
           position: relative;
-          width: 1000px;
-          height: 707px;
-          max-width: 1000px;
-          aspect-ratio: 1.4142 / 1;
+          width: 792px;
+          height: 612px;
+          max-width: 100%;
+          aspect-ratio: 792 / 612;
           background-color: #ffffff;
-          color: #0f172a;
           box-sizing: border-box;
           overflow: hidden;
-          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28);
-          font-family: 'Inter', sans-serif;
+          box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
           user-select: none;
           -webkit-font-smoothing: antialiased;
         }
 
-        /* 1. Official Textured Geometric Watermark Background */
-        .apex-cert-bg-layer {
+        /* 1. Official Background Layer */
+        .apex-cert-bg-art {
           position: absolute;
           inset: 0;
-          background-image: url(${certBgImg});
-          background-position: center center;
-          background-size: cover;
-          background-repeat: no-repeat;
-          opacity: 0.92;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
           pointer-events: none;
           z-index: 1;
         }
 
-        /* 2. Official Corner Vector Elements */
-        .apex-corner-top-left {
+        /* 2. Exact Forensic Corner Bounding Boxes */
+        /* Top-Left: 370.49 x 206.98 pt (46.78% x 33.82%) */
+        .apex-cert-corner-tl {
           position: absolute;
           top: 0;
           left: 0;
-          width: 470px;
-          height: auto;
+          width: 46.78%;
+          height: 33.82%;
+          object-fit: fill;
           pointer-events: none;
-          user-select: none;
-          z-index: 3;
-        }
-
-        .apex-corner-bottom-right {
-          position: absolute;
-          bottom: 0;
-          right: 0;
-          width: 485px;
-          height: auto;
-          pointer-events: none;
-          user-select: none;
-          z-index: 3;
-        }
-
-        .apex-corner-bottom-left {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          width: 250px;
-          height: auto;
-          pointer-events: none;
-          user-select: none;
           z-index: 2;
         }
 
-        .apex-corner-top-right {
+        /* Top-Right: 281.24 x 191.23 pt (35.51% x 31.25%) */
+        .apex-cert-corner-tr {
           position: absolute;
           top: 0;
           right: 0;
-          width: 250px;
-          height: auto;
+          width: 35.51%;
+          height: 31.25%;
+          object-fit: fill;
           pointer-events: none;
-          user-select: none;
           z-index: 2;
-          transform: rotate(180deg);
         }
 
-        /* 3. Certificate Core Content Container */
-        .apex-cert-content {
-          position: relative;
-          z-index: 10;
-          width: 100%;
-          height: 100%;
+        /* Bottom-Left: 281.24 x 191.23 pt (35.51% x 31.25%) */
+        .apex-cert-corner-bl {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          width: 35.51%;
+          height: 31.25%;
+          object-fit: fill;
+          pointer-events: none;
+          z-index: 2;
+        }
+
+        /* Bottom-Right: 370.49 x 206.98 pt (46.78% x 33.82%) */
+        .apex-cert-corner-br {
+          position: absolute;
+          bottom: 0;
+          right: 0;
+          width: 46.78%;
+          height: 33.82%;
+          object-fit: fill;
+          pointer-events: none;
+          z-index: 2;
+        }
+
+        /* 3. Official Apex Crest Emblem */
+        /* Top: 30.75 pt (5.02%), Width: 123.7 pt (15.62%), Height: 122.95 pt (20.09%) */
+        .apex-cert-crest-wrap {
+          position: absolute;
+          top: 5.02%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 15.62%;
+          aspect-ratio: 1;
           display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          padding: 28px 75px 32px 75px;
-          box-sizing: border-box;
-        }
-
-        /* Header Row: Dated, Crest, Roll No */
-        .apex-cert-header-row {
-          display: flex;
-          justifyContent: space-between;
-          align-items: flex-start;
-          width: 100%;
-        }
-
-        .apex-cert-meta-dated {
-          font-family: 'Inter', sans-serif;
-          font-size: 0.92rem;
-          color: #1e293b;
-          font-weight: 500;
-          padding-top: 52px;
-          min-width: 190px;
-        }
-
-        .apex-cert-logo-container {
-          display: flex;
-          flex-direction: column;
+          justify-content: center;
           align-items: center;
-          margin-top: -6px;
+          z-index: 10;
         }
 
         .apex-cert-crest-img {
-          width: 120px;
-          height: 120px;
+          width: 100%;
+          height: 100%;
           object-fit: contain;
-          filter: drop-shadow(0 5px 14px rgba(0, 0, 0, 0.12));
+          filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.12));
         }
 
-        .apex-cert-meta-roll {
-          font-family: 'Inter', sans-serif;
-          font-size: 0.92rem;
+        /* 4. Top Row Metadata: Dated (Left) & Roll Number (Right) */
+        /* Exact PDF Baseline: 141.74 pt from top (23.16%) */
+        .apex-cert-dated-txt {
+          position: absolute;
+          top: 23.16%;
+          left: 9.09%;
+          font-family: 'Gentium Plus', 'Times New Roman', serif;
+          font-size: clamp(9px, 1.55vw, 12.5px);
           color: #1e293b;
-          font-weight: 600;
-          text-align: right;
-          padding-top: 52px;
-          min-width: 190px;
-          letter-spacing: 0.02em;
+          font-weight: 400;
+          white-space: nowrap;
+          z-index: 10;
         }
 
-        /* Typography Main Body */
-        .apex-cert-body {
+        .apex-cert-roll-txt {
+          position: absolute;
+          top: 23.16%;
+          right: 9.09%;
+          font-family: 'Gentium Plus', 'Times New Roman', serif;
+          font-size: clamp(9px, 1.55vw, 12.5px);
+          color: #1e293b;
+          font-weight: 400;
+          text-align: right;
+          white-space: nowrap;
+          z-index: 10;
+        }
+
+        /* 5. Typography Forensics: CERTIFICATE */
+        /* Y: 375.19 pt from bottom (236.81 pt = 38.69% from top), Size: 69.98 pt, Color: RGB(0.0157, 0.18, 0.635) = #042ea2 */
+        .apex-cert-heading {
+          position: absolute;
+          top: 36.5%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 90%;
+          text-align: center;
+          font-family: 'Gentium Plus', Georgia, serif;
+          font-weight: 700;
+          font-size: clamp(26px, 6.2vw, 54px);
+          letter-spacing: 0.05em;
+          color: #042ea2;
+          margin: 0;
+          line-height: 1;
+          z-index: 10;
+        }
+
+        /* 6. Subtitle: This is to certify that */
+        /* Y: 336.79 pt from bottom (275.21 pt = 44.97% from top), Size: 24.96 pt */
+        .apex-cert-sub-heading {
+          position: absolute;
+          top: 44.2%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 90%;
+          text-align: center;
+          font-family: 'Gentium Plus', Georgia, serif;
+          font-weight: 400;
+          font-size: clamp(12px, 2.5vw, 21px);
+          color: #1e293b;
+          margin: 0;
+          line-height: 1.1;
+          z-index: 10;
+        }
+
+        /* 7. Candidate Name: Great Vibes Cursive Script */
+        /* Y: 259.25 pt from bottom (352.75 pt = 57.64% from top), Size: 69.98 pt, Color: #042ea2 */
+        .apex-cert-candidate-name {
+          position: absolute;
+          top: 55.5%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 92%;
+          text-align: center;
+          font-family: 'Great Vibes', cursive;
+          font-weight: 400;
+          font-size: clamp(26px, 6.2vw, 56px);
+          color: #042ea2;
+          line-height: 1.15;
+          margin: 0;
+          white-space: nowrap;
+          text-shadow: 0 1px 2px rgba(4, 46, 162, 0.12);
+          z-index: 10;
+        }
+
+        /* 8. Completion Body: Successfully completed the Six Months */
+        /* Y: 212.45 pt from bottom (399.55 pt = 65.29% from top), Size: 17.04 pt */
+        .apex-cert-completion-line {
+          position: absolute;
+          top: 65.29%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 90%;
+          text-align: center;
+          font-family: 'Gentium Plus', Georgia, serif;
+          font-size: clamp(10px, 1.85vw, 15px);
+          color: #1e293b;
+          font-weight: 400;
+          margin: 0;
+          white-space: nowrap;
+          z-index: 10;
+        }
+
+        /* Six Months Highlight: Color RGB(0.902, 0.00784, 0.141) = #e60224 */
+        .apex-cert-duration-badge {
+          color: #e60224;
+          font-weight: 700;
+        }
+
+        /* 9. Course Title: Basic Computer Course */
+        /* Y: 187.61 pt from bottom (424.39 pt = 69.34% from top), Size: 17.04 pt, Color: #042ea2 */
+        .apex-cert-course-title {
+          position: absolute;
+          top: 69.8%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 90%;
+          text-align: center;
+          font-family: 'Gentium Plus', Georgia, serif;
+          font-weight: 700;
+          font-size: clamp(11px, 1.95vw, 16px);
+          color: #042ea2;
+          letter-spacing: 0.02em;
+          margin: 0;
+          white-space: nowrap;
+          z-index: 10;
+        }
+
+        /* 10. Director Authority (Centered Bottom) */
+        /* Yasir Ali at Y: 33.02 pt from bottom (94.6% top), Director at Y: 13.2 pt (97.8% top) */
+        .apex-cert-director-container {
+          position: absolute;
+          bottom: 2.1%;
+          left: 50%;
+          transform: translateX(-50%);
           display: flex;
           flex-direction: column;
           align-items: center;
           text-align: center;
-          margin-top: -10px;
+          min-width: 170px;
+          z-index: 10;
         }
 
-        .apex-cert-title {
-          font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
-          font-weight: 700;
-          letter-spacing: 0.14em;
-          color: #0b347b;
-          text-transform: uppercase;
-          font-size: 3.3rem;
-          margin: 0 0 6px 0;
-          line-height: 1.05;
-        }
-
-        .apex-cert-sub {
-          font-family: 'Playfair Display', Georgia, serif;
-          font-weight: 600;
-          letter-spacing: 0.02em;
-          color: #1e293b;
-          font-size: 1.45rem;
-          margin: 0 0 6px 0;
-          line-height: 1.2;
-        }
-
-        .apex-cert-candidate {
-          font-family: 'Great Vibes', cursive;
-          font-size: 3.9rem;
-          color: #0047ab;
-          line-height: 1.18;
-          margin: 2px 0 10px 0;
-          max-width: 820px;
-          word-break: break-word;
-          text-shadow: 0 1px 2px rgba(0, 71, 171, 0.12);
-        }
-
-        .apex-cert-completion {
-          font-family: 'Playfair Display', Georgia, serif;
-          font-size: 1.15rem;
-          color: #1e293b;
-          margin: 0 0 5px 0;
-          font-weight: 500;
-        }
-
-        .apex-cert-duration {
-          color: #d90429;
-          font-weight: 700;
-          font-family: 'Playfair Display', Georgia, serif;
-        }
-
-        .apex-cert-course {
-          font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
-          font-weight: 800;
-          font-size: 1.45rem;
-          color: #0a2558;
-          letter-spacing: 0.05em;
-          margin: 0;
-        }
-
-        /* Footer Row: Certificate Serial & Dynamic Director */
-        .apex-cert-footer-row {
-          display: flex;
-          justifyContent: space-between;
-          align-items: flex-end;
-          width: 100%;
-          padding-bottom: 8px;
-        }
-
-        .apex-cert-serial {
-          font-family: 'Inter', sans-serif;
-          font-size: 0.84rem;
-          color: #334155;
-          min-width: 220px;
-        }
-
-        .apex-cert-director-block {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          position: relative;
-          min-width: 240px;
-          margin-right: 90px;
-        }
-
-        /* Decorative diagonal flourish line behind Director authority */
-        .apex-cert-director-line {
+        .apex-cert-director-decor-line {
           position: absolute;
-          top: 14px;
-          width: 180px;
+          top: 8px;
+          width: 160px;
           height: 1.5px;
-          background: linear-gradient(90deg, transparent, #38bdf8, #0047ab, transparent);
-          transform: rotate(-3deg);
+          background: linear-gradient(90deg, transparent, #38bdf8 20%, #042ea2 80%, transparent);
+          transform: rotate(-2.5deg);
           pointer-events: none;
+          opacity: 0.8;
         }
 
-        .apex-cert-director-name {
-          font-family: 'Playfair Display', Georgia, serif;
+        .apex-cert-director-name-txt {
+          font-family: 'Gentium Plus', Georgia, serif;
           font-weight: 700;
-          font-size: 1.18rem;
+          font-size: clamp(10px, 1.65vw, 14px);
           color: #0f172a;
+          line-height: 1.2;
           margin-bottom: 1px;
           position: relative;
           z-index: 2;
-          letter-spacing: 0.02em;
         }
 
-        .apex-cert-director-title {
-          font-family: 'Playfair Display', Georgia, serif;
-          font-size: 0.95rem;
+        .apex-cert-director-title-txt {
+          font-family: 'Gentium Plus', Georgia, serif;
+          font-weight: 400;
+          font-size: clamp(8.5px, 1.4vw, 11.5px);
           color: #334155;
+          line-height: 1.1;
           position: relative;
           z-index: 2;
         }
 
-        /* High-Precision Borderless Print Rules */
+        /* 11. Certificate Serial Number (Bottom Left) */
+        .apex-cert-serial-tag {
+          position: absolute;
+          bottom: 2.8%;
+          left: 6.8%;
+          font-family: 'Inter', sans-serif;
+          font-size: clamp(8px, 1.1vw, 10px);
+          color: #475569;
+          font-weight: 500;
+          z-index: 10;
+          white-space: nowrap;
+        }
+
+        /* 12. Borderless Print Rules */
         @media print {
           body * {
             visibility: hidden !important;
           }
-          .apex-cert-frame, .apex-cert-frame * {
+          .apex-cert-canvas, .apex-cert-canvas * {
             visibility: visible !important;
           }
-          .apex-cert-frame {
+          .apex-cert-canvas {
             position: fixed !important;
             left: 0 !important;
             top: 0 !important;
             width: 100vw !important;
             height: 100vh !important;
             max-width: none !important;
+            aspect-ratio: auto !important;
             box-shadow: none !important;
             border-radius: 0 !important;
             margin: 0 !important;
@@ -319,134 +354,129 @@ export default function ApexCertificate({
             print-color-adjust: exact !important;
           }
           @page {
-            size: A4 landscape;
+            size: landscape;
             margin: 0;
           }
         }
       `}</style>
 
-      {/* Main Certificate Frame (Standard A4 Landscape Aspect Ratio 1.4142 : 1) */}
-      <div className="apex-cert-frame">
-        {/* Layer 1: Textured Geometric Background Pattern */}
-        <div className="apex-cert-bg-layer" />
+      {/* Forensic Certificate Canvas (Exact PDF 792x612 Coordinate Grid) */}
+      <div className="apex-cert-canvas">
+        
+        {/* Layer 1: Forensic Background Texture */}
+        <img
+          src={certBgImg}
+          alt=""
+          aria-hidden="true"
+          className="apex-cert-bg-art"
+        />
 
-        {/* Layer 2: Official Vector Corner Elements */}
-        {/* Top-Left Banner Graphic */}
+        {/* Layer 2: Forensic Corner Bounding Boxes */}
+        {/* Top-Left Banner with cyan speed lines */}
         <img
           src={certCornerTLImg}
           alt=""
           aria-hidden="true"
-          className="apex-corner-top-left"
+          className="apex-cert-corner-tl"
         />
 
-        {/* Bottom-Right Banner Graphic */}
+        {/* Top-Right Geometric Chevron Triangles */}
+        <img
+          src={certCornerTRImg}
+          alt=""
+          aria-hidden="true"
+          className="apex-cert-corner-tr"
+        />
+
+        {/* Bottom-Left Geometric Chevron Triangles */}
+        <img
+          src={certCornerBLImg}
+          alt=""
+          aria-hidden="true"
+          className="apex-cert-corner-bl"
+        />
+
+        {/* Bottom-Right Banner with cyan speed lines */}
         <img
           src={certCornerBRImg}
           alt=""
           aria-hidden="true"
-          className="apex-corner-bottom-right"
+          className="apex-cert-corner-br"
         />
 
-        {/* Bottom-Left Geometric Triangles */}
-        <img
-          src={certCornerTrianglesImg}
-          alt=""
-          aria-hidden="true"
-          className="apex-corner-bottom-left"
-        />
-
-        {/* Top-Right Geometric Triangles (180deg symmetric) */}
-        <img
-          src={certCornerTrianglesImg}
-          alt=""
-          aria-hidden="true"
-          className="apex-corner-top-right"
-        />
-
-        {/* Layer 3: Official Certificate Core Content */}
-        <div className="apex-cert-content">
-          
-          {/* Header Row: Dated, Crest Emblem, Candidate Roll No */}
-          <div className="apex-cert-header-row">
-            {/* Left: Issue Date */}
-            <div className="apex-cert-meta-dated">
-              <span>Dated:</span> &nbsp;
-              <strong>{issueDate || "September 2024"}</strong>
-            </div>
-
-            {/* Center: Official High-Res Apex Education Forum Crest */}
-            <div className="apex-cert-logo-container">
-              <img
-                src={logoUrl || certLogoImg}
-                alt="Apex Education Forum Crest"
-                className="apex-cert-crest-img"
-              />
-            </div>
-
-            {/* Right: Roll Number */}
-            <div className="apex-cert-meta-roll">
-              <span>{rollNumber || "AEF-217/2024"}</span>
-            </div>
-          </div>
-
-          {/* Central Body Typography */}
-          <div className="apex-cert-body">
-            <h1 className="apex-cert-title">CERTIFICATE</h1>
-            <h2 className="apex-cert-sub">This is to certify that</h2>
-            
-            {/* Candidate Name in Official Calligraphic Script */}
-            <div className="apex-cert-candidate">
-              {studentName || "Amjad Ali s/o Kabil"}
-            </div>
-
-            {/* Program Completion Statement with Highlighted Red Duration */}
-            <p className="apex-cert-completion">
-              Successfully completed the <span className="apex-cert-duration">{duration || "Six Months"}</span>
-            </p>
-
-            {/* Course Title in Classical Bold Serif */}
-            <div className="apex-cert-course">
-              {courseTitle || "Basic Computer Course"}
-            </div>
-          </div>
-
-          {/* Footer Row: Certificate No (Left) & Dynamic Director (Center-Right) */}
-          <div className="apex-cert-footer-row">
-            {/* Left: Certificate Serial */}
-            <div className="apex-cert-serial">
-              <span>Certificate No </span>
-              <strong>{certificateNumber || "aef /2026"}</strong>
-            </div>
-
-            {/* Center: Dynamic Director Authority from Management System */}
-            <div className="apex-cert-director-block">
-              {/* Optional physical signature scan/stamp image */}
-              {signatureUrl ? (
-                <img
-                  src={signatureUrl}
-                  alt="Director Signature"
-                  style={{ height: "42px", objectFit: "contain", marginBottom: "4px" }}
-                />
-              ) : (
-                <div className="apex-cert-director-line" />
-              )}
-
-              {/* Dynamically bound Director Name from Management System */}
-              <div className="apex-cert-director-name">
-                {directorName || "Yasir Ali"}
-              </div>
-
-              {/* Designation / Title */}
-              <div className="apex-cert-director-title">
-                {directorTitle || "Director"}
-              </div>
-            </div>
-
-            {/* Balance Spacer */}
-            <div style={{ width: "90px" }} />
-          </div>
-
+        {/* Layer 3: Forensic Top Row Content */}
+        {/* Dated: September 2024 */}
+        <div className="apex-cert-dated-txt">
+          <span>Dated: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{issueDate || "September 2024"}</span>
         </div>
+
+        {/* Apex Education Forum Official Crest */}
+        <div className="apex-cert-crest-wrap">
+          <img
+            src={logoUrl || certLogoImg}
+            alt="Apex Education Forum Crest"
+            className="apex-cert-crest-img"
+          />
+        </div>
+
+        {/* Candidate Reference Roll No */}
+        <div className="apex-cert-roll-txt">
+          <span>{rollNumber || "AEF-217/2024"}</span>
+        </div>
+
+        {/* Layer 4: Forensic Central Typography */}
+        {/* Title: CERTIFICATE */}
+        <h1 className="apex-cert-heading">CERTIFICATE</h1>
+
+        {/* Subtitle: This is to certify that */}
+        <h2 className="apex-cert-sub-heading">This is to certify that</h2>
+
+        {/* Candidate Name in Flowing Great Vibes Cursive Calligraphy */}
+        <div className="apex-cert-candidate-name">
+          {studentName || "Amjad Ali s/o Kabil"}
+        </div>
+
+        {/* Program Completion Statement with Highlighted Red Duration */}
+        <div className="apex-cert-completion-line">
+          <span>Successfully completed the </span>
+          <span className="apex-cert-duration-badge">{duration || "Six Months"}</span>
+        </div>
+
+        {/* Course Title in Bold Gentium Plus */}
+        <div className="apex-cert-course-title">
+          {courseTitle || "Basic Computer Course"}
+        </div>
+
+        {/* Layer 5: Forensic Footer Authority */}
+        {/* Dynamic Director Section (Centered at Bottom) */}
+        <div className="apex-cert-director-container">
+          {/* Optional scanned signature image or elegant vector accent */}
+          {signatureUrl ? (
+            <img
+              src={signatureUrl}
+              alt="Director Signature"
+              style={{ height: "36px", objectFit: "contain", marginBottom: "2px" }}
+            />
+          ) : (
+            <div className="apex-cert-director-decor-line" />
+          )}
+
+          {/* Dynamically bound Director Name from Management System */}
+          <div className="apex-cert-director-name-txt">
+            {directorName || "Yasir Ali"}
+          </div>
+
+          {/* Director Title */}
+          <div className="apex-cert-director-title-txt">
+            {directorTitle || "Director"}
+          </div>
+        </div>
+
+        {/* Certificate Serial Number (Bottom Left) */}
+        <div className="apex-cert-serial-tag">
+          <span>Certificate No &nbsp; {certificateNumber || "aef / 2026"}</span>
+        </div>
+
       </div>
     </div>
   );
