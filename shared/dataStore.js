@@ -496,6 +496,115 @@ export function createBatch(batchData) {
   return newBatch;
 }
 
+export async function updateBatchStatus(batchId, status) {
+  const batches = getBatches();
+  const idx = batches.findIndex(b => b.id === batchId || b.batchCode === batchId);
+  if (idx !== -1) {
+    batches[idx].status = status;
+    if (status === "completed") {
+      batches[idx].completedAt = new Date().toISOString();
+    }
+    localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(batches));
+    window.dispatchEvent(new CustomEvent("apex_batches_changed", { detail: batches }));
+    try {
+      await setDoc(doc(db, "batches", batches[idx].id), { 
+        status,
+        completedAt: batches[idx].completedAt || new Date().toISOString()
+      }, { merge: true });
+    } catch (e) {}
+    return batches[idx];
+  }
+  return null;
+}
+
+export async function issueBatchGraduationCertificates(batchId, studentSelection = null, options = {}) {
+  const batches = getBatches();
+  const batch = batches.find(b => b.id === batchId || b.batchCode === batchId);
+  if (!batch) return [];
+
+  const allStudents = getStudents();
+  let batchStudents = allStudents.filter(s => s.batchCode === batch.batchCode || s.batchId === batch.id);
+  if (batchStudents.length === 0) {
+    batchStudents = allStudents.filter(s => s.course === batch.courseTitle);
+  }
+
+  const targetStudents = studentSelection && Array.isArray(studentSelection)
+    ? (studentSelection[0] && typeof studentSelection[0] === "object"
+        ? studentSelection
+        : allStudents.filter(s => studentSelection.includes(s.id) || studentSelection.includes(s.rollNo)))
+    : batchStudents;
+
+  const dirProfile = getDirectorProfile();
+  const certs = getCertificates();
+  const issuedList = [];
+
+  for (let i = 0; i < targetStudents.length; i++) {
+    const std = targetStudents[i];
+    const stdName = std.studentName || (std.fatherName ? `${std.name} s/o ${std.fatherName}` : std.name);
+    const rollNo = std.rollNo || std.rollNumber || `AEF-${Math.floor(100 + Math.random() * 900)}/${new Date().getFullYear()}`;
+    const certNumber = `aef / ${new Date().getFullYear()}`;
+
+    // Check if certificate already exists
+    let existingIndex = certs.findIndex(c => 
+      c.studentId === std.id || 
+      (c.rollNumber && c.rollNumber === rollNo && (c.batchCode === batch.batchCode || c.courseTitle === (batch.courseTitle || std.course)))
+    );
+
+    if (existingIndex !== -1) {
+      certs[existingIndex].courseTitle = options.courseTitle || certs[existingIndex].courseTitle || batch.courseTitle || "Basic Computer Course";
+      certs[existingIndex].duration = options.duration || certs[existingIndex].duration || "Six Months";
+      certs[existingIndex].issueDate = options.issueDate || certs[existingIndex].issueDate || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      certs[existingIndex].directorName = dirProfile.name || certs[existingIndex].directorName || "Yasir Ali";
+      certs[existingIndex].directorTitle = dirProfile.title || certs[existingIndex].directorTitle || "Director";
+      certs[existingIndex].grade = std.grade || options.grade || certs[existingIndex].grade || "Passed (A+)";
+      certs[existingIndex].batchCode = batch.batchCode || certs[existingIndex].batchCode;
+      certs[existingIndex].batchId = batch.id || certs[existingIndex].batchId;
+      issuedList.push(certs[existingIndex]);
+
+      try {
+        await setDoc(doc(db, "certificates", certs[existingIndex].id), certs[existingIndex], { merge: true });
+      } catch (fsErr) {}
+    } else {
+      const newCert = {
+        id: `cert_batch_${batch.batchCode || batch.id}_${std.id || i}_${Date.now()}`,
+        studentId: std.id,
+        studentName: stdName,
+        courseTitle: options.courseTitle || batch.courseTitle || std.course || "Basic Computer Course",
+        duration: options.duration || "Six Months",
+        issueDate: options.issueDate || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        rollNumber: rollNo,
+        certificateNumber: certNumber,
+        certificateId: rollNo,
+        grade: std.grade || options.grade || "Passed (A+)",
+        batchId: batch.id,
+        batchCode: batch.batchCode,
+        status: "Verified Authentic",
+        directorName: dirProfile.name || "Yasir Ali",
+        directorTitle: dirProfile.title || "Director",
+        createdAt: new Date().toISOString()
+      };
+
+      certs.unshift(newCert);
+      issuedList.push(newCert);
+
+      try {
+        await setDoc(doc(db, "certificates", newCert.id), newCert, { merge: true });
+      } catch (fsErr) {
+        console.warn("Firestore batch certificate sync error:", fsErr);
+      }
+    }
+  }
+
+  try {
+    await updateBatchStatus(batch.id, "completed");
+  } catch (e) {}
+
+  localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(certs));
+  window.dispatchEvent(new CustomEvent("apex_certificates_changed", { detail: certs }));
+
+  return issuedList;
+}
+
 // --- Students ---
 export function getStudents() {
   const data = localStorage.getItem(STORAGE_KEYS.STUDENTS);

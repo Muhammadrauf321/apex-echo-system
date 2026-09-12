@@ -11,6 +11,8 @@ import {
   deleteAllCourses,
   getBatches, 
   createBatch, 
+  updateBatchStatus,
+  issueBatchGraduationCertificates,
   getInquiries, 
   updateInquiryStatus, 
   issueCertificate,
@@ -256,6 +258,15 @@ export default function App() {
   // Institutional Settings & Director Profile
   const [directorProfile, setDirectorProfile] = useState(getDirectorProfile());
   const [selectedCertForModal, setSelectedCertForModal] = useState(null);
+  const [batchGraduationModal, setBatchGraduationModal] = useState(null);
+  const [selectedStudentIdsForGrad, setSelectedStudentIdsForGrad] = useState([]);
+  const [gradOptions, setGradOptions] = useState({
+    courseTitle: "",
+    duration: "Six Months",
+    issueDate: "September 2024"
+  });
+  const [bulkCertsToPrint, setBulkCertsToPrint] = useState(null);
+  const [isIssuingBulkCerts, setIsIssuingBulkCerts] = useState(false);
 
   // Certificate Issuance State
   const [certForm, setCertForm] = useState({
@@ -1037,6 +1048,134 @@ Apex Education Forum`;
       type: "success",
       message: `Certificate successfully issued for ${certForm.studentName} (Serial: ${cert.certificateNumber || cert.certificateId}).`
     });
+  };
+
+  // Toggle Batch Status (Active <-> Completed)
+  const handleToggleBatchStatus = async (batch) => {
+    const nextStatus = batch.status === "completed" ? "active" : "completed";
+    await updateBatchStatus(batch.id, nextStatus);
+    setBatches(getBatches());
+    setStatusBanner({
+      type: "success",
+      message: `Batch ${batch.batchCode} status marked as ${nextStatus.toUpperCase()}.`
+    });
+  };
+
+  // Open Batch Graduation & Passing Certificate Studio
+  const handleOpenBatchGraduation = (batch) => {
+    // 1. Find all students belonging to this batch or course
+    let batchStds = students.filter(s => s.batchCode === batch.batchCode || s.batchId === batch.id);
+    if (batchStds.length === 0) {
+      batchStds = students.filter(s => s.course === batch.courseTitle);
+    }
+
+    // 2. Find exams associated with this batch or course
+    const batchExams = exams.filter(e => e.batchCode === batch.batchCode || e.courseTitle === batch.courseTitle);
+    
+    // Aggregate exam marks
+    const examResultsMap = {};
+    batchExams.forEach(e => {
+      const results = getExamResults(e.id) || [];
+      results.forEach(r => {
+        const key = r.studentId || r.rollNo;
+        if (key) {
+          examResultsMap[key] = r;
+        }
+      });
+    });
+
+    // 3. Map each student with their passing status and exam performance
+    const studentsWithStatus = batchStds.map(std => {
+      const key = std.id || std.rollNo;
+      const examRes = examResultsMap[key] || examResultsMap[std.id] || examResultsMap[std.rollNo];
+      
+      let hasPassed = true;
+      let scoreDisplay = "Completed Course Modules (Passed)";
+      let grade = "Passed (A+)";
+
+      if (examRes) {
+        const obt = Number(examRes.obtainedMarks) || 0;
+        const total = Number(examRes.totalMarks) || 50;
+        const passing = Number(examRes.passingMarks) || Math.round(total * 0.5);
+        const pct = examRes.percentage || Math.round((obt / total) * 100);
+        hasPassed = examRes.status === "PASSED" || obt >= passing || pct >= 50;
+        scoreDisplay = `${obt}/${total} (${pct}%) - ${examRes.grade || (hasPassed ? "Passed" : "Retake")}`;
+        grade = examRes.grade || (hasPassed ? "Passed (A)" : "Failed");
+      }
+
+      const existingCert = certificates.find(c => 
+        c.studentId === std.id || 
+        (c.rollNumber && c.rollNumber === std.rollNo && (c.batchCode === batch.batchCode || c.courseTitle === batch.courseTitle))
+      );
+
+      return {
+        ...std,
+        studentName: std.fatherName ? `${std.name} s/o ${std.fatherName}` : std.name,
+        rollNo: std.rollNo || `AEF-${Math.floor(100 + Math.random() * 900)}/${new Date().getFullYear()}`,
+        hasPassed,
+        scoreDisplay,
+        grade,
+        existingCert
+      };
+    });
+
+    // Auto-select students who have passed
+    const passingIds = studentsWithStatus.filter(s => s.hasPassed).map(s => s.id);
+    setSelectedStudentIdsForGrad(passingIds);
+
+    setGradOptions({
+      courseTitle: batch.courseTitle || "Basic Computer Course",
+      duration: "Six Months",
+      issueDate: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    });
+
+    setBatchGraduationModal({
+      batch,
+      students: studentsWithStatus
+    });
+  };
+
+  // Execute Batch Graduation & Generate All Passing Certificates at Once
+  const handleExecuteBatchGraduation = async () => {
+    if (!batchGraduationModal || !batchGraduationModal.batch) return;
+    setIsIssuingBulkCerts(true);
+    try {
+      const batch = batchGraduationModal.batch;
+      const selectedStudents = batchGraduationModal.students.filter(s => 
+        selectedStudentIdsForGrad.includes(s.id)
+      );
+
+      if (selectedStudents.length === 0) {
+        alert("Please select at least one passing student to generate certificates.");
+        setIsIssuingBulkCerts(false);
+        return;
+      }
+
+      const issued = await issueBatchGraduationCertificates(batch.id, selectedStudents, gradOptions);
+      
+      await updateBatchStatus(batch.id, "completed");
+      setBatches(getBatches());
+      setCertificates(getCertificates());
+
+      confetti({
+        particleCount: 130,
+        spread: 80,
+        origin: { y: 0.6 }
+      });
+
+      setStatusBanner({
+        type: "success",
+        message: `🎉 Batch Completed! Generated ${issued.length} official accredited certificates for ${batch.batchCode}. Opening multi-page PDF print preview...`
+      });
+
+      setBatchGraduationModal(null);
+      setBulkCertsToPrint(issued);
+    } catch (err) {
+      console.error("Batch certificate generation error:", err);
+      alert("Error generating batch certificates. Please try again.");
+    } finally {
+      setIsIssuingBulkCerts(false);
+    }
   };
 
   // --- Examination Handlers ---
@@ -2002,39 +2141,122 @@ Apex Education Forum`;
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
-                {batches.map((b) => (
-                  <div key={b.id} className="glass-panel" style={{ padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                    <div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-                        <span className="badge badge-indigo" style={{ fontWeight: 800 }}>{b.batchCode}</span>
-                        <span className="badge badge-emerald">● Active</span>
+                {batches.map((b) => {
+                  const batchCerts = certificates.filter(c => c.batchCode === b.batchCode || c.batchId === b.id || (b.courseTitle && c.courseTitle === b.courseTitle));
+                  const enrolledStudents = students.filter(s => s.batchCode === b.batchCode || s.batchId === b.id || s.course === b.courseTitle);
+
+                  return (
+                    <div key={b.id} className="glass-panel" style={{ padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                      <div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span className="badge badge-indigo" style={{ fontWeight: 800 }}>{b.batchCode}</span>
+                            {b.status === "completed" ? (
+                              <span className="badge badge-amber" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                <CheckCircle2 size={12} />
+                                <span>Completed</span>
+                              </span>
+                            ) : (
+                              <span className="badge badge-emerald" style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                <span>● Active</span>
+                              </span>
+                            )}
+                          </div>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleToggleBatchStatus(b)}
+                              title={b.status === "completed" ? "Reactivate batch" : "Mark batch as completed"}
+                              style={{
+                                background: "rgba(255,255,255,0.06)",
+                                border: "1px solid rgba(255,255,255,0.12)",
+                                borderRadius: "6px",
+                                padding: "3px 8px",
+                                fontSize: "0.72rem",
+                                color: "#94a3b8",
+                                cursor: "pointer"
+                              }}
+                            >
+                              {b.status === "completed" ? "Re-activate" : "Mark Completed"}
+                            </button>
+                          )}
+                        </div>
+
+                        <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "8px" }}>{b.courseTitle}</h3>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "0.85rem", color: "var(--text-muted)", margin: "14px 0" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <Clock size={15} color="#38bdf8" />
+                            <span>{b.timeSlot}</span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <Building size={15} color="#818cf8" />
+                            <span>{b.lab}</span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <UserCheck size={15} color="#34d399" />
+                            <span>Instructor: <strong>{b.instructor}</strong></span>
+                          </div>
+                        </div>
                       </div>
 
-                      <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "8px" }}>{b.courseTitle}</h3>
+                      <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "14px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+                            Enrolled: <strong>{enrolledStudents.length || b.enrolledCount} / {b.capacity}</strong>
+                          </span>
+                          {batchCerts.length > 0 && (
+                            <span style={{ fontSize: "0.75rem", color: "#34d399", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}>
+                              <Award size={13} />
+                              <span>{batchCerts.length} Issued</span>
+                            </span>
+                          )}
+                        </div>
 
-                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "0.85rem", color: "var(--text-muted)", margin: "14px 0" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <Clock size={15} color="#38bdf8" />
-                          <span>{b.timeSlot}</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <Building size={15} color="#818cf8" />
-                          <span>{b.lab}</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <UserCheck size={15} color="#34d399" />
-                          <span>Instructor: <strong>{b.instructor}</strong></span>
-                        </div>
+                        {isAdmin && (
+                          <div style={{ display: "flex", gap: "8px", marginTop: "2px" }}>
+                            <button
+                              onClick={() => handleOpenBatchGraduation(b)}
+                              className="btn-primary"
+                              style={{
+                                flex: 1,
+                                padding: "7px 12px",
+                                fontSize: "0.8rem",
+                                background: b.status === "completed" 
+                                  ? "linear-gradient(135deg, #059669, #10b981)" 
+                                  : "linear-gradient(135deg, #4f46e5, #4338ca)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "6px"
+                              }}
+                            >
+                              <GraduationCap size={15} />
+                              <span>{b.status === "completed" ? "Batch Certificates" : "Graduate & Issue Certs"}</span>
+                            </button>
+
+                            {batchCerts.length > 0 && (
+                              <button
+                                onClick={() => setBulkCertsToPrint(batchCerts)}
+                                className="btn-secondary"
+                                title="Print all passing certificates for this batch in one multi-page PDF"
+                                style={{
+                                  padding: "7px 12px",
+                                  fontSize: "0.8rem",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "5px"
+                                }}
+                              >
+                                <Printer size={14} />
+                                <span>PDF ({batchCerts.length})</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-
-                    <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
-                        Enrolled: <strong>{b.enrolledCount} / {b.capacity}</strong>
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -2877,6 +3099,76 @@ Apex Education Forum`;
                   Official institutional credentials with layered geometric vector borders, calligraphic student typography, and authenticated serial verification
                 </p>
               </div>
+            </div>
+
+            {/* 0. Batch Graduation & Bulk Certificate PDF Generator Hub */}
+            <div className="glass-panel" style={{ padding: "20px 24px", marginBottom: "24px", borderLeft: "4px solid #10b981", background: "rgba(6, 78, 59, 0.18)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
+                <div>
+                  <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <GraduationCap size={20} color="#34d399" />
+                    <span>Batch Graduation & Bulk Certificate PDF Generator</span>
+                  </h3>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.82rem", margin: "3px 0 0 0" }}>
+                    Select any completed or graduating batch to automatically generate official accredited certificates for all students who passed the exams, and print or download them together in a single multi-page PDF.
+                  </p>
+                </div>
+              </div>
+
+              {batches.length === 0 ? (
+                <div style={{ padding: "16px", color: "var(--text-muted)", fontSize: "0.85rem", textAlign: "center" }}>
+                  No campus batches scheduled yet.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "14px" }}>
+                  {batches.map(batch => {
+                    const batchCerts = certificates.filter(c => c.batchCode === batch.batchCode || c.batchId === batch.id || (batch.courseTitle && c.courseTitle === batch.courseTitle));
+                    const batchStds = students.filter(s => s.batchCode === batch.batchCode || s.batchId === batch.id || s.course === batch.courseTitle);
+                    return (
+                      <div key={batch.id} style={{ background: "rgba(0,0,0,0.35)", padding: "14px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                            <span className="badge badge-indigo" style={{ fontWeight: 800, fontSize: "0.75rem" }}>{batch.batchCode}</span>
+                            {batch.status === "completed" ? (
+                              <span className="badge badge-amber" style={{ fontSize: "0.7rem", display: "flex", alignItems: "center", gap: "3px" }}>
+                                <CheckCircle2 size={11} />
+                                <span>Completed</span>
+                              </span>
+                            ) : (
+                              <span className="badge badge-emerald" style={{ fontSize: "0.7rem" }}>Active</span>
+                            )}
+                          </div>
+                          <div style={{ fontWeight: 700, color: "#ffffff", fontSize: "0.92rem", marginBottom: "4px" }}>{batch.courseTitle}</div>
+                          <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginBottom: "12px" }}>
+                            Enrolled: <strong>{batchStds.length}</strong> | Certs Generated: <strong style={{ color: "#34d399" }}>{batchCerts.length}</strong>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <button
+                            onClick={() => handleOpenBatchGraduation(batch)}
+                            className="btn-primary"
+                            style={{ flex: 1, padding: "7px 10px", fontSize: "0.78rem", background: "linear-gradient(135deg, #0284c7, #0369a1)", display: "flex", alignItems: "center", justifyContent: "center", gap: "5px" }}
+                          >
+                            <GraduationCap size={14} />
+                            <span>Graduate / Issue All</span>
+                          </button>
+                          {batchCerts.length > 0 && (
+                            <button
+                              onClick={() => setBulkCertsToPrint(batchCerts)}
+                              className="btn-secondary"
+                              title="Print batch certificates as multi-page PDF"
+                              style={{ padding: "7px 10px", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "4px" }}
+                            >
+                              <Printer size={13} />
+                              <span>PDF ({batchCerts.length})</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* 1. Dynamic Director & Signatory Authority Card */}
@@ -5431,7 +5723,7 @@ Apex Education Forum`;
           overflowY: "auto"
         }}>
           {/* Action Header bar */}
-          <div style={{
+          <div className="no-print" style={{
             width: "100%",
             maxWidth: "1020px",
             display: "flex",
@@ -5507,6 +5799,391 @@ Apex Education Forum`;
                 directorTitle={directorProfile?.title || selectedCertForModal.directorTitle || "Director"}
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 12. Modal: Batch Graduation & Passing Students Certificate Selection */}
+      {batchGraduationModal && batchGraduationModal.batch && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(3, 7, 18, 0.88)",
+          backdropFilter: "blur(10px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
+          zIndex: 99998,
+          overflowY: "auto"
+        }}>
+          <div className="glass-panel" style={{
+            width: "100%",
+            maxWidth: "920px",
+            maxHeight: "90vh",
+            overflowY: "auto",
+            padding: "28px",
+            background: "#0a1128",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            borderRadius: "16px",
+            boxShadow: "0 25px 60px rgba(0, 0, 0, 0.8)"
+          }}>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", borderBottom: "1px solid rgba(255,255,255,0.1)", paddingBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ width: "42px", height: "42px", borderRadius: "10px", background: "linear-gradient(135deg, #059669, #10b981)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <GraduationCap size={24} color="#ffffff" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#ffffff", margin: 0 }}>
+                    Batch Graduation &amp; Official Passing Certificates
+                  </h3>
+                  <div style={{ fontSize: "0.84rem", color: "#94a3b8", marginTop: "2px" }}>
+                    Batch <strong style={{ color: "#38bdf8" }}>{batchGraduationModal.batch.batchCode}</strong> • {batchGraduationModal.batch.courseTitle} ({batchGraduationModal.batch.timeSlot})
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setBatchGraduationModal(null)}
+                className="btn-secondary"
+                style={{ padding: "6px 12px", fontSize: "0.85rem" }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* KPI Summary Banner */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
+              <div style={{ background: "rgba(0,0,0,0.3)", padding: "12px 16px", borderRadius: "10px", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ fontSize: "0.75rem", color: "#94a3b8", textTransform: "uppercase" }}>Total Enrolled</div>
+                <div style={{ fontSize: "1.35rem", fontWeight: 800, color: "#ffffff" }}>{batchGraduationModal.students.length}</div>
+              </div>
+              <div style={{ background: "rgba(16, 185, 129, 0.1)", padding: "12px 16px", borderRadius: "10px", border: "1px solid rgba(16, 185, 129, 0.25)" }}>
+                <div style={{ fontSize: "0.75rem", color: "#34d399", textTransform: "uppercase" }}>Passed Exam / Eligible</div>
+                <div style={{ fontSize: "1.35rem", fontWeight: 800, color: "#34d399" }}>
+                  {batchGraduationModal.students.filter(s => s.hasPassed).length}
+                </div>
+              </div>
+              <div style={{ background: "rgba(56, 189, 248, 0.1)", padding: "12px 16px", borderRadius: "10px", border: "1px solid rgba(56, 189, 248, 0.25)" }}>
+                <div style={{ fontSize: "0.75rem", color: "#38bdf8", textTransform: "uppercase" }}>Selected for Certificate</div>
+                <div style={{ fontSize: "1.35rem", fontWeight: 800, color: "#38bdf8" }}>
+                  {selectedStudentIdsForGrad.length}
+                </div>
+              </div>
+            </div>
+
+            {/* Certificate Parameters Config */}
+            <div style={{ background: "rgba(15, 23, 42, 0.6)", padding: "16px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.08)", marginBottom: "20px" }}>
+              <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#ffffff", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <Award size={15} color="#eab308" />
+                <span>Certificate Program Parameters (Applied to All Batch Certificates)</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", color: "#94a3b8", marginBottom: "4px" }}>Course Title</label>
+                  <input
+                    type="text"
+                    value={gradOptions.courseTitle}
+                    onChange={(e) => setGradOptions({ ...gradOptions, courseTitle: e.target.value })}
+                    style={{ width: "100%", padding: "8px 10px", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", color: "#ffffff", fontSize: "0.85rem" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", color: "#94a3b8", marginBottom: "4px" }}>Program Duration</label>
+                  <input
+                    type="text"
+                    value={gradOptions.duration}
+                    onChange={(e) => setGradOptions({ ...gradOptions, duration: e.target.value })}
+                    placeholder="e.g. Six Months"
+                    style={{ width: "100%", padding: "8px 10px", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", color: "#f87171", fontWeight: 700, fontSize: "0.85rem" }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", color: "#94a3b8", marginBottom: "4px" }}>Issue Date</label>
+                  <input
+                    type="text"
+                    value={gradOptions.issueDate}
+                    onChange={(e) => setGradOptions({ ...gradOptions, issueDate: e.target.value })}
+                    placeholder="e.g. September 2024"
+                    style={{ width: "100%", padding: "8px 10px", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "6px", color: "#ffffff", fontSize: "0.85rem" }}
+                  />
+                </div>
+              </div>
+              <div style={{ fontSize: "0.74rem", color: "#64748b", marginTop: "8px", display: "flex", alignItems: "center", gap: "5px" }}>
+                <ShieldCheck size={12} color="#38bdf8" />
+                <span>Executive Signatory Authority: <strong>{directorProfile?.name || "Yasir Ali"}</strong> ({directorProfile?.title || "Director"})</span>
+              </div>
+            </div>
+
+            {/* Students Table with Selection & Exam Results */}
+            <div style={{ marginBottom: "24px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#ffffff" }}>
+                  Enrolled Students &amp; Exam Performance
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    onClick={() => {
+                      const passingIds = batchGraduationModal.students.filter(s => s.hasPassed).map(s => s.id);
+                      setSelectedStudentIdsForGrad(passingIds);
+                    }}
+                    style={{ padding: "4px 10px", fontSize: "0.75rem", background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.3)", borderRadius: "6px", color: "#34d399", cursor: "pointer", fontWeight: 700 }}
+                  >
+                    Select Passed Only
+                  </button>
+                  <button
+                    onClick={() => setSelectedStudentIdsForGrad(batchGraduationModal.students.map(s => s.id))}
+                    style={{ padding: "4px 10px", fontSize: "0.75rem", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", color: "#ffffff", cursor: "pointer" }}
+                  >
+                    Select All ({batchGraduationModal.students.length})
+                  </button>
+                  <button
+                    onClick={() => setSelectedStudentIdsForGrad([])}
+                    style={{ padding: "4px 10px", fontSize: "0.75rem", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "6px", color: "#94a3b8", cursor: "pointer" }}
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ maxHeight: "280px", overflowY: "auto", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "10px", background: "rgba(0,0,0,0.25)" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem" }}>
+                  <thead>
+                    <tr style={{ background: "rgba(255,255,255,0.04)", borderBottom: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8", textAlign: "left" }}>
+                      <th style={{ padding: "10px 12px", width: "36px" }}></th>
+                      <th style={{ padding: "10px 12px" }}>Roll No</th>
+                      <th style={{ padding: "10px 12px" }}>Candidate &amp; Parentage</th>
+                      <th style={{ padding: "10px 12px" }}>Exam Performance</th>
+                      <th style={{ padding: "10px 12px" }}>Credential Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batchGraduationModal.students.map(std => {
+                      const isSelected = selectedStudentIdsForGrad.includes(std.id);
+                      return (
+                        <tr
+                          key={std.id}
+                          onClick={() => {
+                            setSelectedStudentIdsForGrad(prev => 
+                              prev.includes(std.id) ? prev.filter(id => id !== std.id) : [...prev, std.id]
+                            );
+                          }}
+                          style={{
+                            borderBottom: "1px solid rgba(255,255,255,0.04)",
+                            background: isSelected ? "rgba(56, 189, 248, 0.08)" : "transparent",
+                            cursor: "pointer"
+                          }}
+                        >
+                          <td style={{ padding: "10px 12px" }}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {}} // handled by row click
+                              style={{ cursor: "pointer", accentColor: "#10b981" }}
+                            />
+                          </td>
+                          <td style={{ padding: "10px 12px", fontWeight: 700, color: "#38bdf8" }}>
+                            {std.rollNo}
+                          </td>
+                          <td style={{ padding: "10px 12px", color: "#ffffff", fontWeight: 600 }}>
+                            {std.studentName}
+                          </td>
+                          <td style={{ padding: "10px 12px" }}>
+                            {std.hasPassed ? (
+                              <span className="badge badge-emerald" style={{ fontSize: "0.72rem", padding: "2px 8px" }}>
+                                {std.scoreDisplay}
+                              </span>
+                            ) : (
+                              <span className="badge badge-rose" style={{ fontSize: "0.72rem", padding: "2px 8px" }}>
+                                {std.scoreDisplay}
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ padding: "10px 12px" }}>
+                            {std.existingCert ? (
+                              <span style={{ fontSize: "0.72rem", color: "#34d399", display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                <CheckCircle2 size={12} />
+                                <span>Issued ({std.existingCert.certificateNumber || std.existingCert.certificateId})</span>
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                                Ready to Generate
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "16px" }}>
+              <button
+                onClick={() => setBatchGraduationModal(null)}
+                className="btn-secondary"
+                style={{ padding: "9px 18px", fontSize: "0.85rem" }}
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleExecuteBatchGraduation}
+                disabled={isIssuingBulkCerts || selectedStudentIdsForGrad.length === 0}
+                className="btn-primary"
+                style={{
+                  background: "linear-gradient(135deg, #059669, #10b981)",
+                  padding: "10px 24px",
+                  fontSize: "0.92rem",
+                  fontWeight: 800,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)",
+                  opacity: selectedStudentIdsForGrad.length === 0 ? 0.5 : 1
+                }}
+              >
+                <GraduationCap size={18} />
+                <span>
+                  {isIssuingBulkCerts 
+                    ? "Generating Certificates..." 
+                    : `Generate & Open Multi-Page PDF (${selectedStudentIdsForGrad.length} Certificates)`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 13. Modal: Bulk Multi-Page Certificate Generator & PDF Print */}
+      {bulkCertsToPrint && bulkCertsToPrint.length > 0 && (
+        <div className="apex-cert-modal-overlay" style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(5, 8, 22, 0.96)",
+          backdropFilter: "blur(12px)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          zIndex: 99999,
+          overflowY: "auto",
+          padding: "20px 10px"
+        }}>
+          {/* Sticky Action Header Bar - strictly hidden on @media print via no-print class */}
+          <div className="no-print" style={{
+            width: "100%",
+            maxWidth: "1020px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "20px",
+            padding: "12px 20px",
+            background: "rgba(15, 23, 42, 0.95)",
+            borderRadius: "14px",
+            border: "1px solid rgba(255, 255, 255, 0.15)",
+            boxShadow: "0 10px 30px rgba(0,0,0,0.5)",
+            position: "sticky",
+            top: "10px",
+            zIndex: 100
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div style={{ width: "38px", height: "38px", borderRadius: "50%", background: "linear-gradient(135deg, #059669, #10b981)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <GraduationCap size={22} color="#ffffff" />
+              </div>
+              <div>
+                <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#ffffff" }}>
+                  Batch Passing Certificates Ready for Print &amp; PDF Export
+                </div>
+                <div style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
+                  Total: <strong style={{ color: "#34d399" }}>{bulkCertsToPrint.length} Certified Candidates</strong> • In Print Dialog choose <strong>"Save as PDF" (Landscape)</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <button
+                onClick={() => window.print()}
+                className="btn-primary"
+                style={{
+                  padding: "9px 20px",
+                  fontSize: "0.9rem",
+                  fontWeight: 800,
+                  background: "linear-gradient(135deg, #059669, #10b981)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  boxShadow: "0 4px 14px rgba(16, 185, 129, 0.4)"
+                }}
+              >
+                <Printer size={17} />
+                <span>Download &amp; Print All ({bulkCertsToPrint.length}) as PDF</span>
+              </button>
+              <button
+                onClick={() => setBulkCertsToPrint(null)}
+                className="btn-secondary"
+                style={{ padding: "9px 14px", fontSize: "0.85rem" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+
+          {/* Certificates Container */}
+          <div style={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "24px"
+          }}>
+            {bulkCertsToPrint.map((cert, idx) => (
+              <div 
+                key={cert.id || cert.certificateId || idx}
+                className="apex-bulk-cert-card"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  width: "100%"
+                }}
+              >
+                {/* Visual page indicator (screen only) */}
+                <div className="no-print" style={{
+                  color: "#64748b",
+                  fontSize: "0.78rem",
+                  fontWeight: 600,
+                  marginBottom: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}>
+                  <span>Certificate #{idx + 1} of {bulkCertsToPrint.length}</span>
+                  <span>—</span>
+                  <span style={{ color: "#38bdf8" }}>{cert.studentName}</span>
+                  <span>({cert.rollNumber || cert.certificateNumber})</span>
+                </div>
+
+                {/* Certificate Canvas */}
+                <div style={{
+                  boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
+                  borderRadius: "4px",
+                  overflow: "hidden"
+                }}>
+                  <ApexCertificate
+                    studentName={cert.studentName}
+                    courseTitle={cert.courseTitle}
+                    duration={cert.duration || "Six Months"}
+                    issueDate={cert.issueDate}
+                    rollNumber={cert.rollNumber || cert.certificateId}
+                    certificateNumber={cert.certificateNumber || cert.certificateId}
+                    directorName={directorProfile?.name || cert.directorName || "Yasir Ali"}
+                    directorTitle={directorProfile?.title || cert.directorTitle || "Director"}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

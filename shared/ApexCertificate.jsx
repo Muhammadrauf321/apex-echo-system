@@ -330,18 +330,49 @@ export default function ApexCertificate({
           white-space: nowrap;
         }
 
-        /* 12. Borderless Print Rules */
+        /* 12. Borderless Print Rules (Supports Single & Multi-Page Bulk PDF Printing) */
         @media print {
           body * {
+            visibility: hidden;
+          }
+          .no-print, .no-print * {
+            display: none !important;
             visibility: hidden !important;
+          }
+          .apex-cert-modal-overlay {
+            position: static !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            overflow: visible !important;
+            height: auto !important;
+            width: 100% !important;
+            display: block !important;
           }
           .apex-cert-canvas, .apex-cert-canvas * {
             visibility: visible !important;
           }
+          .apex-cert-outer-container {
+            visibility: visible !important;
+            page-break-after: always !important;
+            break-after: page !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .apex-bulk-cert-card:last-child .apex-cert-outer-container,
+          .apex-cert-outer-container:last-child {
+            page-break-after: auto !important;
+            break-after: auto !important;
+          }
           .apex-cert-canvas {
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
+            position: relative !important;
             width: 100vw !important;
             height: 100vh !important;
             max-width: none !important;
