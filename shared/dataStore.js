@@ -650,28 +650,180 @@ export function clearChannelMessages(channelId) {
   window.dispatchEvent(new CustomEvent("apex_messages_changed", { detail: { channelId } }));
 }
 
+// --- Institutional Settings & Director Profile (Dynamic Across System) ---
+export function getDirectorProfile() {
+  if (typeof localStorage === "undefined") {
+    return { name: "Yasir Ali", title: "Director" };
+  }
+  const data = localStorage.getItem("apex_director_profile");
+  if (data) {
+    try {
+      return JSON.parse(data);
+    } catch (e) {}
+  }
+  return {
+    name: "Yasir Ali",
+    title: "Director"
+  };
+}
+
+export async function saveDirectorProfile(profile) {
+  if (typeof localStorage !== "undefined") {
+    localStorage.setItem("apex_director_profile", JSON.stringify(profile));
+    window.dispatchEvent(new CustomEvent("apex_director_profile_changed", { detail: profile }));
+  }
+  try {
+    await setDoc(doc(db, "settings", "director_profile"), profile, { merge: true });
+  } catch (fsErr) {
+    console.warn("Firestore director profile save notice:", fsErr);
+  }
+}
+
+export function subscribeToDirectorProfile(callback) {
+  if (typeof window === "undefined") return () => {};
+
+  callback(getDirectorProfile());
+
+  let unsubscribeFirestore = () => {};
+  try {
+    unsubscribeFirestore = onSnapshot(doc(db, "settings", "director_profile"), (snap) => {
+      if (snap.exists()) {
+        const live = snap.data();
+        localStorage.setItem("apex_director_profile", JSON.stringify(live));
+        callback(live);
+        window.dispatchEvent(new CustomEvent("apex_director_profile_changed", { detail: live }));
+      }
+    });
+  } catch (e) {}
+
+  const handleLocal = (e) => {
+    callback(e.detail || getDirectorProfile());
+  };
+  window.addEventListener("apex_director_profile_changed", handleLocal);
+
+  return () => {
+    unsubscribeFirestore();
+    window.removeEventListener("apex_director_profile_changed", handleLocal);
+  };
+}
+
 // --- Certificates ---
 export function getCertificates() {
+  if (typeof localStorage === "undefined") return [];
   const data = localStorage.getItem(STORAGE_KEYS.CERTIFICATES);
-  return data ? JSON.parse(data) : [];
+  let certs = data ? JSON.parse(data) : [];
+
+  // Seed sample official certificate from institutional archives if registry is empty
+  if (!certs || certs.length === 0) {
+    certs = [
+      {
+        id: "cert_official_aef_217_2024",
+        certificateId: "AEF-217/2024",
+        certificateNumber: "aef / 2026",
+        rollNumber: "AEF-217/2024",
+        studentName: "Amjad Ali s/o Kabil",
+        courseTitle: "Basic Computer Course",
+        duration: "Six Months",
+        issueDate: "September 2024",
+        grade: "Distinction (A+)",
+        status: "Verified Authentic",
+        directorName: "Yasir Ali",
+        directorTitle: "Director",
+        createdAt: new Date().toISOString()
+      }
+    ];
+    localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(certs));
+  }
+  return certs;
+}
+
+export function subscribeToCertificates(callback) {
+  if (typeof window === "undefined") return () => {};
+
+  callback(getCertificates());
+
+  let unsubscribeFirestore = () => {};
+  try {
+    const colRef = collection(db, "certificates");
+    unsubscribeFirestore = onSnapshot(colRef, (snapshot) => {
+      if (!snapshot.empty) {
+        const liveCerts = [];
+        snapshot.forEach(docSnap => {
+          liveCerts.push({ id: docSnap.id, ...docSnap.data() });
+        });
+        localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(liveCerts));
+        callback(liveCerts);
+        window.dispatchEvent(new CustomEvent("apex_certificates_changed", { detail: liveCerts }));
+      }
+    }, (err) => {
+      console.warn("Firestore certificates subscription notice:", err);
+    });
+  } catch (e) {}
+
+  const handleLocal = (e) => {
+    callback(e.detail || getCertificates());
+  };
+  window.addEventListener("apex_certificates_changed", handleLocal);
+
+  return () => {
+    unsubscribeFirestore();
+    window.removeEventListener("apex_certificates_changed", handleLocal);
+  };
 }
 
 export function verifyCertificate(certificateId) {
+  if (!certificateId) return null;
   const certs = getCertificates();
-  return certs.find(c => c.certificateId.trim().toUpperCase() === certificateId.trim().toUpperCase()) || null;
+  const query = certificateId.trim().toUpperCase();
+  const found = certs.find(c => 
+    (c.certificateId && c.certificateId.trim().toUpperCase() === query) ||
+    (c.certificateNumber && c.certificateNumber.trim().toUpperCase() === query) ||
+    (c.rollNumber && c.rollNumber.trim().toUpperCase() === query) ||
+    (c.studentName && c.studentName.trim().toUpperCase() === query)
+  );
+  if (!found) return null;
+
+  // Dynamically attach live Director profile so certificate updates instantly when Director changes name
+  const dirProfile = getDirectorProfile();
+  return {
+    ...found,
+    valid: true,
+    directorName: dirProfile.name || found.directorName || "Yasir Ali",
+    directorTitle: dirProfile.title || found.directorTitle || "Director"
+  };
 }
 
-export function issueCertificate(certData) {
+export async function issueCertificate(certData) {
   const certs = getCertificates();
+  const dirProfile = getDirectorProfile();
+
   const newCert = {
-    certificateId: `APEX-CERT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-    issueDate: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+    id: `cert_${Date.now()}`,
+    certificateId: certData.certificateNumber || `AEF-${Math.floor(100 + Math.random() * 900)}/${new Date().getFullYear()}`,
+    certificateNumber: certData.certificateNumber || `aef / ${new Date().getFullYear()}`,
+    rollNumber: certData.rollNumber || `AEF-${Math.floor(100 + Math.random() * 900)}/${new Date().getFullYear()}`,
+    studentName: certData.studentName || "Scholar",
+    courseTitle: certData.courseTitle || "Basic Computer Course",
+    issueDate: certData.issueDate || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
     status: "Verified Authentic",
+    duration: certData.duration || "Six Months",
+    directorName: dirProfile.name || "Yasir Ali",
+    directorTitle: dirProfile.title || "Director",
+    createdAt: new Date().toISOString(),
     ...certData
   };
+
   certs.unshift(newCert);
   localStorage.setItem(STORAGE_KEYS.CERTIFICATES, JSON.stringify(certs));
   window.dispatchEvent(new CustomEvent("apex_certificates_changed", { detail: certs }));
+
+  // Sync to Cloud Firestore for permanent verification across devices
+  try {
+    await setDoc(doc(db, "certificates", newCert.id), newCert, { merge: true });
+  } catch (fsErr) {
+    console.warn("Firestore issueCertificate sync notice:", fsErr);
+  }
+
   return newCert;
 }
 

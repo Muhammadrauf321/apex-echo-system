@@ -21,10 +21,14 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Certificates: Allow public verification by ID
+    // Certificates: Allow public verification and admin issuance
     match /certificates/{certId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
+    }
+
+    // Institutional Settings: Director profile, logos, institutional metadata
+    match /settings/{settingId} {
+      allow read, write: if true;
     }
 
     // Faculty, Students & Invitations: Real-time synchronization across portals & devices

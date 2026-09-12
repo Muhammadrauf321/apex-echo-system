@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import EcosystemNav, { getAppUrl } from "@shared/EcosystemNav.jsx";
-import { getCourses, subscribeToCourses, submitInquiry, verifyCertificate } from "@shared/dataStore.js";
+import { getCourses, subscribeToCourses, submitInquiry, verifyCertificate, subscribeToCertificates } from "@shared/dataStore.js";
+import ApexCertificate from "@shared/ApexCertificate.jsx";
 import confetti from "canvas-confetti";
 import { 
   Globe, 
@@ -41,6 +42,7 @@ export default function App() {
   const [certQuery, setCertQuery] = useState("");
   const [certResult, setCertResult] = useState(null);
   const [certSearched, setCertSearched] = useState(false);
+  const [showVerifiedCertModal, setShowVerifiedCertModal] = useState(false);
 
   // Fast-track Admission Form state
   const [formData, setFormData] = useState({
@@ -66,17 +68,29 @@ export default function App() {
   // Anti-Gravity Physics Canvas Ref
   const canvasRef = useRef(null);
 
-  // Real-time Firestore courses subscription (Management LMS is the Single Source of Truth)
+  // Real-time Firestore courses & certificates subscription (Management LMS is the Single Source of Truth)
   useEffect(() => {
-    const unsubscribe = subscribeToCourses((liveCourses) => {
+    const unsubCourses = subscribeToCourses((liveCourses) => {
       setCourses(liveCourses);
       if (liveCourses.length > 0 && !selectedCourseForForm) {
         setSelectedCourseForForm(liveCourses[0].title);
         setFormData(prev => ({ ...prev, courseId: liveCourses[0].id }));
       }
     });
-    return () => unsubscribe();
-  }, []);
+
+    const unsubCerts = subscribeToCertificates(() => {
+      // Re-verify active query if user is currently viewing a result
+      if (certQuery) {
+        const updated = verifyCertificate(certQuery.trim());
+        if (updated) setCertResult(updated);
+      }
+    });
+
+    return () => {
+      unsubCourses();
+      unsubCerts();
+    };
+  }, [certQuery, selectedCourseForForm]);
 
   // Anti-Gravity Ambient Floating Particles Canvas
   useEffect(() => {
@@ -1048,6 +1062,17 @@ export default function App() {
                       <div>Course: <strong>{certResult.courseTitle || "Professional Program"}</strong></div>
                       <div>Issue Date: <strong>{certResult.issueDate || "Official"}</strong></div>
                     </div>
+
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setShowVerifiedCertModal(true)}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-bold text-xs shadow-lg transition-all cursor-pointer"
+                      >
+                        <Award className="w-4 h-4" />
+                        <span>View &amp; Print Official Certificate</span>
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="bg-red-950/80 border border-red-500/50 rounded-2xl p-6 text-white backdrop-blur-md text-center">
@@ -1055,6 +1080,53 @@ export default function App() {
                     <p className="text-xs text-slate-400 mt-1">Please check the serial format or contact the campus administration desk.</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Modal for Verified Official Certificate */}
+            {showVerifiedCertModal && certResult && (
+              <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-4 z-[99999] overflow-y-auto">
+                <div className="w-full max-w-5xl flex items-center justify-between mb-3 bg-slate-900/90 px-4 py-3 rounded-xl border border-white/10 shadow-2xl">
+                  <div className="flex items-center gap-3 text-white">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                      <Award className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-sm sm:text-base">Verified Institutional Credential</h4>
+                      <p className="text-xs text-slate-400">Authentic Apex Education Forum Accredited Certificate</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => window.print()}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow cursor-pointer"
+                    >
+                      <Printer className="w-4 h-4" />
+                      <span>Print (A4)</span>
+                    </button>
+                    <button
+                      onClick={() => setShowVerifiedCertModal(false)}
+                      className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-w-full overflow-x-auto flex justify-center p-2">
+                  <div className="shadow-2xl rounded-sm overflow-hidden">
+                    <ApexCertificate
+                      studentName={certResult.studentName}
+                      courseTitle={certResult.courseTitle}
+                      duration={certResult.duration || "Six Months"}
+                      issueDate={certResult.issueDate}
+                      rollNumber={certResult.rollNumber || certResult.certificateId}
+                      certificateNumber={certResult.certificateNumber || certResult.certificateId}
+                      directorName={certResult.directorName || "Yasir Ali"}
+                      directorTitle={certResult.directorTitle || "Director"}
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>

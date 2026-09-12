@@ -15,6 +15,10 @@ import {
   updateInquiryStatus, 
   issueCertificate,
   getCertificates,
+  subscribeToCertificates,
+  getDirectorProfile,
+  saveDirectorProfile,
+  subscribeToDirectorProfile,
   getExams,
   subscribeToExams,
   createExam,
@@ -32,6 +36,7 @@ import {
   getExamResults,
   saveExamResults
 } from "@shared/dataStore.js";
+import ApexCertificate from "@shared/ApexCertificate.jsx";
 import { BATCH_SLOTS, FEE_STATUS, ROLES, ROLE_LABELS, EXAM_STATUS, EXAM_STATUS_LABELS } from "@shared/constants.js";
 import confetti from "canvas-confetti";
 import { 
@@ -248,13 +253,21 @@ export default function App() {
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split("T")[0]);
   const [studentAttendanceMarks, setStudentAttendanceMarks] = useState({});
 
+  // Institutional Settings & Director Profile
+  const [directorProfile, setDirectorProfile] = useState(getDirectorProfile());
+  const [selectedCertForModal, setSelectedCertForModal] = useState(null);
+
   // Certificate Issuance State
   const [certForm, setCertForm] = useState({
-    studentName: "",
-    courseTitle: courses[0]?.title || "",
+    studentName: "Amjad Ali s/o Kabil",
+    courseTitle: courses[0]?.title || "Basic Computer Course",
+    duration: "Six Months",
     grade: "A+ with Distinction",
-    instructorName: "",
-    skills: "React, Node.js, Cloud Firestore"
+    issueDate: "September 2024",
+    rollNumber: "AEF-217/2024",
+    certificateNumber: `aef / ${new Date().getFullYear()}`,
+    instructorName: "Muhammad Rauf",
+    skills: "Computer Applications, MS Office, Typing, Internet Fluency"
   });
   const [issuedCert, setIssuedCert] = useState(null);
 
@@ -338,6 +351,14 @@ export default function App() {
       setExams(liveExams);
     });
 
+    const unsubDirector = subscribeToDirectorProfile((profile) => {
+      setDirectorProfile(profile);
+    });
+
+    const unsubCerts = subscribeToCertificates((liveCerts) => {
+      setCertificates(liveCerts);
+    });
+
     const handleCourses = () => setCourses(getCourses());
     const handleInq = () => setInquiries(getInquiries());
     const handleBatches = () => setBatches(getBatches());
@@ -358,6 +379,8 @@ export default function App() {
       unsubCourses();
       unsubTeachers();
       unsubExams();
+      unsubDirector();
+      unsubCerts();
       window.removeEventListener("apex_courses_changed", handleCourses);
       window.removeEventListener("apex_inquiries_changed", handleInq);
       window.removeEventListener("apex_batches_changed", handleBatches);
@@ -989,21 +1012,31 @@ Apex Education Forum`;
   };
 
   // Handle Issue Certificate
-  const handleIssueCertificate = (e) => {
+  const handleIssueCertificate = async (e) => {
     e.preventDefault();
     if (!certForm.studentName) return;
 
-    const cert = issueCertificate({
+    const cert = await issueCertificate({
       studentName: certForm.studentName,
       courseTitle: certForm.courseTitle,
-      grade: certForm.grade,
-      instructorName: certForm.instructorName || "Faculty Director",
-      skills: certForm.skills.split(",").map(s => s.trim())
+      duration: certForm.duration || "Six Months",
+      issueDate: certForm.issueDate || "September 2024",
+      rollNumber: certForm.rollNumber || "AEF-217/2024",
+      certificateNumber: certForm.certificateNumber || `aef / ${new Date().getFullYear()}`,
+      grade: certForm.grade || "A+ with Distinction",
+      instructorName: certForm.instructorName || "Faculty Instructor",
+      directorName: directorProfile?.name || currentUser?.name || "Engr. Muhammad Rauf",
+      directorTitle: directorProfile?.title || "Director",
+      skills: certForm.skills ? certForm.skills.split(",").map(s => s.trim()) : []
     });
 
     setIssuedCert(cert);
     setCertificates(getCertificates());
     confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } });
+    setStatusBanner({
+      type: "success",
+      message: `Certificate successfully issued for ${certForm.studentName} (Serial: ${cert.certificateNumber || cert.certificateId}).`
+    });
   };
 
   // --- Examination Handlers ---
@@ -2839,123 +2872,232 @@ Apex Education Forum`;
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <div>
-                <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>Digital Certificate Generator</h2>
+                <h2 style={{ fontSize: "1.35rem", fontWeight: 800 }}>Official Digital Certificate Generator</h2>
                 <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                  Issue verified digital credentials with authenticated serial numbers
+                  Official institutional credentials with layered geometric vector borders, calligraphic student typography, and authenticated serial verification
                 </p>
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
+            {/* 1. Dynamic Director & Signatory Authority Card */}
+            <div className="glass-panel" style={{ padding: "20px 24px", marginBottom: "24px", borderLeft: "4px solid #0284c7", background: "rgba(10, 25, 47, 0.6)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "14px" }}>
+                <div>
+                  <h3 style={{ fontSize: "1.08rem", fontWeight: 800, color: "#ffffff", display: "flex", alignItems: "center", gap: "8px" }}>
+                    <ShieldCheck size={18} color="#38bdf8" />
+                    <span>Institutional Signatory Authority & Dynamic Director Name</span>
+                  </h3>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.82rem", margin: "3px 0 0 0" }}>
+                    Any modification here instantly updates all digital certificates, print views, student portals, and online verifications in real-time.
+                  </p>
+                </div>
+                <span className="badge badge-emerald" style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                  <CheckCircle2 size={12} />
+                  <span>Real-Time Dynamic Sync Active</span>
+                </span>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "var(--text-dim)", marginBottom: "6px" }}>
+                    Executive Director Name (Appears on Certificate Signature) *
+                  </label>
+                  <input
+                    type="text"
+                    value={directorProfile?.name || ""}
+                    onChange={(e) => {
+                      const updated = { ...(directorProfile || {}), name: e.target.value };
+                      setDirectorProfile(updated);
+                      saveDirectorProfile(updated);
+                    }}
+                    placeholder="e.g. Engr. Muhammad Rauf / Yasir Ali"
+                    style={{ width: "100%", padding: "10px 14px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#38bdf8", fontWeight: 700, fontSize: "0.92rem" }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "var(--text-dim)", marginBottom: "6px" }}>
+                    Signatory Designation / Title
+                  </label>
+                  <input
+                    type="text"
+                    value={directorProfile?.title || ""}
+                    onChange={(e) => {
+                      const updated = { ...(directorProfile || {}), title: e.target.value };
+                      setDirectorProfile(updated);
+                      saveDirectorProfile(updated);
+                    }}
+                    placeholder="e.g. Director / Executive Director"
+                    style={{ width: "100%", padding: "10px 14px", background: "rgba(0,0,0,0.4)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff", fontSize: "0.92rem" }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Certificate Issuance & Live Preview Grid */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", alignItems: "start" }}>
+              
+              {/* Left Column: Form */}
               <div className="glass-panel" style={{ padding: "24px" }}>
-                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "16px" }}>Issue Certificate</h3>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Award size={18} color="#eab308" />
+                  <span>Issue Official Certificate</span>
+                </h3>
                 <form onSubmit={handleIssueCertificate}>
                   <div style={{ marginBottom: "14px" }}>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Student Name *</label>
+                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Candidate Name & Parentage *</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Student Full Name"
+                      placeholder="e.g. Amjad Ali s/o Kabil"
                       value={certForm.studentName}
                       onChange={(e) => setCertForm({ ...certForm, studentName: e.target.value })}
-                      style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                      style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff", fontWeight: 600 }}
                     />
                   </div>
 
-                  <div style={{ marginBottom: "14px" }}>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Course Program</label>
-                    <select
-                      value={certForm.courseTitle}
-                      onChange={(e) => setCertForm({ ...certForm, courseTitle: e.target.value })}
-                      style={{ width: "100%", padding: "10px", background: "#090d16", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
-                    >
-                      {courses.map(c => (
-                        <option key={c.id} value={c.title}>{c.title}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: "12px", marginBottom: "14px" }}>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Grade</label>
+                      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Course Program</label>
                       <input
                         type="text"
-                        value={certForm.grade}
-                        onChange={(e) => setCertForm({ ...certForm, grade: e.target.value })}
+                        required
+                        placeholder="e.g. Basic Computer Course"
+                        value={certForm.courseTitle}
+                        onChange={(e) => setCertForm({ ...certForm, courseTitle: e.target.value })}
                         style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
                       />
                     </div>
                     <div>
-                      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Instructor</label>
+                      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Program Duration</label>
                       <input
                         type="text"
-                        value={certForm.instructorName}
-                        onChange={(e) => setCertForm({ ...certForm, instructorName: e.target.value })}
+                        required
+                        placeholder="e.g. Six Months"
+                        value={certForm.duration}
+                        onChange={(e) => setCertForm({ ...certForm, duration: e.target.value })}
+                        style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#f87171", fontWeight: 700 }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "14px" }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Issue Date</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. September 2024"
+                        value={certForm.issueDate}
+                        onChange={(e) => setCertForm({ ...certForm, issueDate: e.target.value })}
+                        style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Roll / Ref No.</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. AEF-217/2024"
+                        value={certForm.rollNumber}
+                        onChange={(e) => setCertForm({ ...certForm, rollNumber: e.target.value })}
+                        style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Certificate No.</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. aef / 2026"
+                        value={certForm.certificateNumber}
+                        onChange={(e) => setCertForm({ ...certForm, certificateNumber: e.target.value })}
                         style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
                       />
                     </div>
                   </div>
 
-                  <div style={{ marginBottom: "20px" }}>
-                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, marginBottom: "6px" }}>Skills (comma separated)</label>
-                    <input
-                      type="text"
-                      value={certForm.skills}
-                      onChange={(e) => setCertForm({ ...certForm, skills: e.target.value })}
-                      style={{ width: "100%", padding: "10px", background: "rgba(0,0,0,0.3)", border: "1px solid var(--border-subtle)", borderRadius: "8px", color: "#ffffff" }}
-                    />
-                  </div>
-
-                  <button type="submit" className="btn-primary" style={{ width: "100%" }}>
-                    <Award size={16} />
-                    <span>Issue Verified Certificate</span>
+                  <button type="submit" className="btn-primary" style={{ width: "100%", background: "linear-gradient(135deg, #0284c7, #0369a1)", padding: "12px", fontWeight: 700, marginTop: "8px" }}>
+                    <Award size={18} />
+                    <span>Issue Verified Official Certificate</span>
                   </button>
                 </form>
               </div>
 
-              {/* Certificate Preview */}
-              <div>
-                <div className="glass-panel" style={{ padding: "28px", border: "2px solid #eab308", background: "#0a0e1a", minHeight: "340px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: "0.78rem", color: "#eab308", textTransform: "uppercase", letterSpacing: "0.15em", fontWeight: 800 }}>
-                      Certificate of Achievement
-                    </div>
-                    <div style={{ fontSize: "1.3rem", fontWeight: 900, marginTop: "4px" }}>
-                      APEX EDUCATION FORUM
-                    </div>
+              {/* Right Column: High-Fidelity Live Preview */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: "0.92rem", fontWeight: 700, color: "#ffffff", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <FileText size={16} color="#38bdf8" />
+                    <span>Official Vector Certificate Live Preview</span>
                   </div>
-
-                  <div style={{ textAlign: "center", margin: "20px 0" }}>
-                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>This is awarded to</div>
-                    <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#ffffff", margin: "4px 0" }}>
-                      {certForm.studentName || "Candidate Name"}
-                    </div>
-                    <div style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-                      for completing the course
-                    </div>
-                    <div style={{ fontSize: "1rem", fontWeight: 700, color: "#38bdf8", marginTop: "2px" }}>
-                      {certForm.courseTitle}
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "12px", fontSize: "0.75rem", color: "var(--text-dim)" }}>
-                    <div>Apex Faculty Board</div>
-                    <div style={{ color: "#eab308", fontWeight: 700 }}>
-                      {issuedCert ? issuedCert.certificateId : "APEX-CERT-PREVIEW"}
-                    </div>
-                  </div>
+                  <button
+                    onClick={() => window.print()}
+                    className="btn-primary"
+                    style={{ padding: "6px 14px", fontSize: "0.82rem", background: "linear-gradient(135deg, #10b981, #059669)", display: "flex", alignItems: "center", gap: "6px" }}
+                  >
+                    <Printer size={14} />
+                    <span>Print A4 Landscape</span>
+                  </button>
                 </div>
 
-                {issuedCert && (
-                  <div style={{ marginTop: "14px", display: "flex", justifyContent: "flex-end" }}>
-                    <button onClick={() => window.print()} className="btn-secondary" style={{ fontSize: "0.85rem" }}>
-                      <Printer size={15} />
-                      <span>Print Certificate</span>
-                    </button>
+                <div className="glass-panel" style={{ padding: "12px", background: "#050811", borderRadius: "12px", overflow: "hidden", minHeight: "410px" }}>
+                  <div style={{ transform: "scale(0.56)", transformOrigin: "top left", width: "1000px", height: "700px", marginBottom: "-305px" }}>
+                    <ApexCertificate
+                      studentName={certForm.studentName}
+                      courseTitle={certForm.courseTitle}
+                      duration={certForm.duration}
+                      issueDate={certForm.issueDate}
+                      rollNumber={certForm.rollNumber}
+                      certificateNumber={certForm.certificateNumber}
+                      directorName={directorProfile?.name || "Engr. Muhammad Rauf"}
+                      directorTitle={directorProfile?.title || "Director"}
+                    />
                   </div>
-                )}
+                </div>
               </div>
+
             </div>
+
+            {/* 3. Official Certificate Registry */}
+            <div style={{ marginTop: "32px" }}>
+              <h3 style={{ fontSize: "1.15rem", fontWeight: 800, marginBottom: "16px", color: "#ffffff", display: "flex", alignItems: "center", gap: "8px" }}>
+                <CheckCircle2 size={18} color="#34d399" />
+                <span>Verified Issued Credentials Registry ({certificates.length})</span>
+              </h3>
+
+              {certificates.length === 0 ? (
+                <div className="glass-panel" style={{ padding: "30px", textAlign: "center", color: "var(--text-muted)" }}>
+                  No certificates issued yet. Fill the form above to generate and issue an official accredited credential.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "16px" }}>
+                  {certificates.map(cert => (
+                    <div key={cert.id || cert.certificateId} className="glass-panel" style={{ padding: "18px", borderLeft: "4px solid #00d2ff" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                        <span className="badge badge-indigo" style={{ fontWeight: 800 }}>{cert.certificateNumber || cert.certificateId}</span>
+                        <span className="badge badge-emerald">Verified</span>
+                      </div>
+                      <h4 style={{ fontSize: "1.05rem", fontWeight: 800, color: "#ffffff", marginBottom: "4px" }}>
+                        {cert.studentName}
+                      </h4>
+                      <div style={{ fontSize: "0.84rem", color: "#38bdf8", marginBottom: "8px" }}>
+                        {cert.courseTitle} ({cert.duration || "Six Months"})
+                      </div>
+                      <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>Dated: {cert.issueDate}</span>
+                        <button
+                          onClick={() => setSelectedCertForModal(cert)}
+                          className="btn-secondary"
+                          style={{ padding: "4px 10px", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "4px" }}
+                        >
+                          <Printer size={12} />
+                          <span>View & Print</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 
@@ -3318,9 +3460,13 @@ Apex Education Forum`;
                     </div>
                     <div style={{ fontSize: "0.75rem", color: "var(--text-dim)", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <span>Issued: {cert.issueDate}</span>
-                      <button onClick={() => window.print()} className="btn-secondary" style={{ padding: "4px 10px", fontSize: "0.75rem" }}>
+                      <button 
+                        onClick={() => setSelectedCertForModal(cert)} 
+                        className="btn-primary" 
+                        style={{ padding: "5px 12px", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: "6px" }}
+                      >
                         <Printer size={13} />
-                        <span>Print</span>
+                        <span>View &amp; Print Certificate</span>
                       </button>
                     </div>
                   </div>
@@ -5264,6 +5410,102 @@ Apex Education Forum`;
                   <span style={{ fontSize: "8px", color: "#64748b" }}>Apex Education Forum</span>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 11. Modal: High-Fidelity Official Apex Certificate Preview & Print */}
+      {selectedCertForModal && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(3, 7, 18, 0.88)",
+          backdropFilter: "blur(10px)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "16px",
+          zIndex: 99999,
+          overflowY: "auto"
+        }}>
+          {/* Action Header bar */}
+          <div style={{
+            width: "100%",
+            maxWidth: "1020px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "12px",
+            padding: "8px 16px",
+            background: "rgba(15, 23, 42, 0.95)",
+            borderRadius: "12px",
+            border: "1px solid rgba(255, 255, 255, 0.12)"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "linear-gradient(135deg, #0284c7, #0369a1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Award size={18} color="#ffffff" />
+              </div>
+              <div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "#ffffff" }}>
+                  Official Accredited Certificate
+                </div>
+                <div style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                  Serial: {selectedCertForModal.certificateNumber || selectedCertForModal.certificateId} | Roll: {selectedCertForModal.rollNumber || "AEF"}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button
+                onClick={() => window.print()}
+                className="btn-primary"
+                style={{
+                  padding: "7px 16px",
+                  fontSize: "0.85rem",
+                  background: "linear-gradient(135deg, #059669, #10b981)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                <Printer size={15} />
+                <span>Print Certificate (A4 Landscape)</span>
+              </button>
+              <button
+                onClick={() => setSelectedCertForModal(null)}
+                className="btn-secondary"
+                style={{ padding: "7px 12px", fontSize: "0.85rem" }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </div>
+
+          {/* Certificate Container with responsive scaling */}
+          <div style={{
+            maxWidth: "100%",
+            overflowX: "auto",
+            display: "flex",
+            justifyContent: "center",
+            padding: "10px"
+          }}>
+            <div style={{
+              boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.7)",
+              borderRadius: "4px",
+              overflow: "hidden"
+            }}>
+              <ApexCertificate
+                studentName={selectedCertForModal.studentName}
+                courseTitle={selectedCertForModal.courseTitle}
+                duration={selectedCertForModal.duration || "Six Months"}
+                issueDate={selectedCertForModal.issueDate}
+                rollNumber={selectedCertForModal.rollNumber || selectedCertForModal.certificateId}
+                certificateNumber={selectedCertForModal.certificateNumber || selectedCertForModal.certificateId}
+                directorName={directorProfile?.name || selectedCertForModal.directorName || "Yasir Ali"}
+                directorTitle={directorProfile?.title || selectedCertForModal.directorTitle || "Director"}
+              />
             </div>
           </div>
         </div>
