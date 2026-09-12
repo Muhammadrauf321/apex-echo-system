@@ -202,6 +202,95 @@ export function setCurrentUser(user) {
   }
 }
 
+// Dynamically resolve user role and faculty profile from Firestore collections
+export async function resolveUserRoleAndProfile(email, uid, currentData = {}) {
+  const cleanEmail = (email || "").trim().toLowerCase();
+  const isAdminEmail = cleanEmail === "muhammadraufbaloch6@gmail.com" || cleanEmail === ADMIN_USER.email.toLowerCase();
+
+  if (isAdminEmail) {
+    return {
+      role: ROLES.DIRECTOR,
+      title: "Executive Director & Founder",
+      department: currentData.department || "",
+      name: currentData.name || "Engr. Muhammad Rauf"
+    };
+  }
+
+  // 1. Check Firestore 'teachers' collection
+  try {
+    const teachersCol = collection(db, "teachers");
+    const tSnap = await getDocs(teachersCol);
+    for (const d of tSnap.docs) {
+      const t = d.data();
+      if (t.email && t.email.trim().toLowerCase() === cleanEmail) {
+        return {
+          role: ROLES.INSTRUCTOR,
+          department: t.department || currentData.department || "",
+          name: t.name || currentData.name || cleanEmail.split("@")[0],
+          teacherId: d.id,
+          phone: t.phone || currentData.phone || "",
+          title: "Faculty Instructor"
+        };
+      }
+    }
+  } catch (err) {
+    console.warn("Firestore teachers lookup notice:", err);
+  }
+
+  // 2. Check local 'teachers' store
+  try {
+    const localTeachers = typeof localStorage !== "undefined" ? JSON.parse(localStorage.getItem("apex_teachers") || "[]") : [];
+    const localT = localTeachers.find(t => t.email && t.email.trim().toLowerCase() === cleanEmail);
+    if (localT) {
+      return {
+        role: ROLES.INSTRUCTOR,
+        department: localT.department || currentData.department || "",
+        name: localT.name || currentData.name || cleanEmail.split("@")[0],
+        teacherId: localT.id,
+        phone: localT.phone || currentData.phone || "",
+        title: "Faculty Instructor"
+      };
+    }
+  } catch (err) {}
+
+  // 3. Check Firestore 'invitations' collection
+  try {
+    const invCol = collection(db, "invitations");
+    const iSnap = await getDocs(invCol);
+    for (const d of iSnap.docs) {
+      const inv = d.data();
+      if (inv.email && inv.email.trim().toLowerCase() === cleanEmail) {
+        if (inv.role === "instructor" || inv.role === ROLES.INSTRUCTOR) {
+          return {
+            role: ROLES.INSTRUCTOR,
+            department: inv.department || currentData.department || "",
+            name: inv.name || currentData.name || cleanEmail.split("@")[0],
+            title: "Faculty Instructor"
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Firestore invitations lookup notice:", err);
+  }
+
+  // 4. Preserve instructor role if already set in existing profile or registered account
+  if (currentData.role === ROLES.INSTRUCTOR || currentData.role === "instructor") {
+    return {
+      role: ROLES.INSTRUCTOR,
+      department: currentData.department || "",
+      name: currentData.name || cleanEmail.split("@")[0],
+      title: currentData.title || "Faculty Instructor"
+    };
+  }
+
+  return {
+    role: currentData.role || ROLES.STUDENT,
+    department: currentData.department || "",
+    name: currentData.name || cleanEmail.split("@")[0]
+  };
+}
+
 // Real Cross-Port + Firebase Auth listener
 export function subscribeToAuth(callback) {
   let lastUid = getCrossPortCookie(SESSION_COOKIE_NAME);
@@ -242,22 +331,25 @@ export function subscribeToAuth(callback) {
       try {
         const userDocRef = doc(db, "users", fbUser.uid);
         const userSnap = await getDoc(userDocRef);
-        let profile = null;
-        if (userSnap.exists()) {
-          profile = userSnap.data();
-        } else {
-          const isAdminEmail = fbUser.email === "muhammadraufbaloch6@gmail.com" || fbUser.email === ADMIN_USER.email;
-          profile = {
-            uid: fbUser.uid,
-            email: fbUser.email,
-            name: fbUser.displayName || (isAdminEmail ? "Muhammad Rauf" : fbUser.email.split("@")[0]),
-            role: isAdminEmail ? "director" : "student",
-            status: "active"
-          };
-          try {
-            await setDoc(userDocRef, profile);
-          } catch (e) {}
+        const existingData = userSnap.exists() ? userSnap.data() : {};
+        const resolved = await resolveUserRoleAndProfile(fbUser.email, fbUser.uid, existingData);
+
+        let profile = {
+          ...existingData,
+          ...resolved,
+          uid: fbUser.uid,
+          email: fbUser.email,
+          status: "active"
+        };
+
+        if (!profile.name || profile.name === fbUser.email.split("@")[0]) {
+          profile.name = fbUser.displayName || resolved.name || fbUser.email.split("@")[0];
         }
+
+        try {
+          await setDoc(userDocRef, profile, { merge: true });
+        } catch (e) {}
+
         setCurrentUser(profile);
       } catch (err) {
         console.warn("Firestore user sync warning:", err);
@@ -727,15 +819,25 @@ export async function loginWithEmail(email, password) {
     updateTeacherStatus(cleanEmail, "active");
     const userDocRef = doc(db, "users", cred.user.uid);
     const userSnap = await getDoc(userDocRef);
+    const existingData = userSnap.exists() ? userSnap.data() : {};
+    const resolved = await resolveUserRoleAndProfile(cleanEmail, cred.user.uid, existingData);
+
     let profile = {
+      ...existingData,
+      ...resolved,
       uid: cred.user.uid,
       email: cred.user.email,
-      name: cred.user.displayName || cleanEmail.split("@")[0],
-      role: cleanEmail === "muhammadraufbaloch6@gmail.com" ? "director" : "student"
+      status: "active"
     };
-    if (userSnap.exists()) {
-      profile = userSnap.data();
+
+    if (!profile.name || profile.name === cleanEmail.split("@")[0]) {
+      profile.name = cred.user.displayName || resolved.name || cleanEmail.split("@")[0];
     }
+
+    try {
+      await setDoc(userDocRef, profile, { merge: true });
+    } catch (e) {}
+
     setCurrentUser(profile);
     return { success: true, user: profile };
   } catch (error) {
@@ -763,26 +865,31 @@ export async function loginWithGoogle() {
     const fbUser = result.user;
     const cleanEmail = fbUser.email.toLowerCase();
 
-    // Check if user is Director / Admin
-    const isAdminEmail = cleanEmail === "muhammadraufbaloch6@gmail.com" || cleanEmail === ADMIN_USER.email.toLowerCase();
-    
     // Check if user has a pending invitation (Faculty or Student)
     const invitations = getInvitations();
     const pendingInv = invitations.find(i => i.email.toLowerCase() === cleanEmail && i.status === "pending_activation");
 
-    let role = ROLES.STUDENT;
-    let name = fbUser.displayName || cleanEmail.split("@")[0];
-    let department = "";
+    let existingProfileData = {};
+    try {
+      const snap = await getDoc(doc(db, "users", fbUser.uid));
+      if (snap.exists()) {
+        existingProfileData = snap.data();
+      }
+    } catch (e) {}
+
+    const resolved = await resolveUserRoleAndProfile(cleanEmail, fbUser.uid, {
+      ...existingProfileData,
+      name: fbUser.displayName,
+      department: pendingInv?.department || existingProfileData?.department || ""
+    });
+
+    let role = resolved.role;
+    let name = resolved.name || fbUser.displayName || cleanEmail.split("@")[0];
+    let department = resolved.department || "";
     let course = "";
     let batchCode = "";
 
-    if (isAdminEmail) {
-      role = ROLES.DIRECTOR;
-      name = "Engr. Muhammad Rauf";
-    } else if (pendingInv) {
-      role = pendingInv.role === "instructor" ? ROLES.INSTRUCTOR : ROLES.STUDENT;
-      name = pendingInv.name || name;
-      department = pendingInv.department || "";
+    if (pendingInv) {
       course = pendingInv.course || "";
       batchCode = pendingInv.batchCode || "";
       
@@ -799,9 +906,11 @@ export async function loginWithGoogle() {
       const accounts = getRegisteredAccounts();
       const existing = accounts.find(a => a.email.toLowerCase() === cleanEmail);
       if (existing) {
-        role = existing.role || ROLES.STUDENT;
+        if (role === ROLES.STUDENT && existing.role) {
+          role = existing.role;
+        }
         name = existing.name || name;
-        department = existing.department || "";
+        department = department || existing.department || "";
         course = existing.course || "";
         batchCode = existing.batchCode || "";
       }

@@ -16,6 +16,7 @@ import {
   issueCertificate,
   getCertificates,
   getExams,
+  subscribeToExams,
   createExam,
   updateExamQuestions,
   submitExamPaper,
@@ -333,6 +334,10 @@ export default function App() {
       setTeachers(liveTeachers);
     });
 
+    const unsubExams = subscribeToExams((liveExams) => {
+      setExams(liveExams);
+    });
+
     const handleCourses = () => setCourses(getCourses());
     const handleInq = () => setInquiries(getInquiries());
     const handleBatches = () => setBatches(getBatches());
@@ -352,6 +357,7 @@ export default function App() {
     return () => {
       unsubCourses();
       unsubTeachers();
+      unsubExams();
       window.removeEventListener("apex_courses_changed", handleCourses);
       window.removeEventListener("apex_inquiries_changed", handleInq);
       window.removeEventListener("apex_batches_changed", handleBatches);
@@ -1003,17 +1009,27 @@ Apex Education Forum`;
   // --- Examination Handlers ---
 
   // Admin schedules exam (Starts at Awaiting Teacher Submission, Admin approval locked)
-  const handleScheduleExamSubmit = (e) => {
+  const handleScheduleExamSubmit = async (e) => {
     e.preventDefault();
     const course = courses.find(c => c.id === newExamForm.courseId);
 
-    createExam({
+    const assignedTeacher = teachers.find(t => 
+      (newExamForm.assignedTeacherId && t.id === newExamForm.assignedTeacherId) ||
+      (newExamForm.assignedTeacherName && t.name?.trim().toLowerCase() === newExamForm.assignedTeacherName?.trim().toLowerCase())
+    );
+
+    const teacherEmail = (newExamForm.assignedTeacherEmail || assignedTeacher?.email || "").trim().toLowerCase();
+    const teacherId = newExamForm.assignedTeacherId || assignedTeacher?.id || "";
+    const teacherName = newExamForm.assignedTeacherName || assignedTeacher?.name || "Assigned Faculty";
+
+    await createExam({
       title: newExamForm.title,
       courseId: newExamForm.courseId,
       courseTitle: course ? course.title : "Examination",
       batchCode: newExamForm.batchCode || (batches[0]?.batchCode || "General Batch"),
-      assignedTeacherId: newExamForm.assignedTeacherId,
-      assignedTeacherName: newExamForm.assignedTeacherName || "Assigned Faculty",
+      assignedTeacherId: teacherId,
+      assignedTeacherEmail: teacherEmail,
+      assignedTeacherName: teacherName,
       createdById: currentUser?.uid || "admin",
       createdByName: currentUser?.name || "Muhammad Rauf (Director)",
       examDate: newExamForm.examDate,
@@ -1027,7 +1043,7 @@ Apex Education Forum`;
     setShowScheduleExamModal(false);
     setStatusBanner({
       type: "success",
-      message: `Exam scheduled successfully. Question formulation delegated to ${newExamForm.assignedTeacherName}. Admin approval access is locked until submission.`
+      message: `Exam scheduled successfully. Question formulation delegated to ${teacherName}. Real-time synchronization active for Teacher Portal.`
     });
   };
 
@@ -1116,10 +1132,27 @@ Apex Education Forum`;
   // Filter exams strictly by Role
   const visibleExams = exams.filter(e => {
     if (isTeacher) {
-      // Teacher only sees exams assigned to their email or name
-      return e.assignedTeacherEmail === currentUser?.email || 
-             e.assignedTeacherName?.toLowerCase() === currentUser?.name?.toLowerCase() ||
-             e.assignedTeacherId === currentUser?.uid;
+      const userEmail = (currentUser?.email || "").trim().toLowerCase();
+      const userName = (currentUser?.name || "").trim().toLowerCase();
+      const userUid = currentUser?.uid || currentUser?.id || "";
+
+      // Find matching faculty record
+      const teacherRec = teachers.find(t => 
+        (t.email && t.email.trim().toLowerCase() === userEmail) ||
+        (t.id && (t.id === userUid || t.id === e.assignedTeacherId))
+      );
+      const teacherRecId = teacherRec ? teacherRec.id : null;
+      const teacherRecName = teacherRec?.name ? teacherRec.name.trim().toLowerCase() : "";
+
+      const examTeacherEmail = (e.assignedTeacherEmail || "").trim().toLowerCase();
+      const examTeacherName = (e.assignedTeacherName || "").trim().toLowerCase();
+
+      const matchEmail = examTeacherEmail && examTeacherEmail === userEmail;
+      const matchName = (userName && examTeacherName && examTeacherName === userName) ||
+                        (teacherRecName && examTeacherName && examTeacherName === teacherRecName);
+      const matchId = (e.assignedTeacherId && (e.assignedTeacherId === userUid || e.assignedTeacherId === teacherRecId));
+
+      return matchEmail || matchName || matchId;
     }
     // Admin sees all exams
     return true;

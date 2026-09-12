@@ -38,6 +38,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Examinations: Real-time lifecycle sync across Admin & Faculty portals
+    match /exams/{examId} {
+      allow read, write: if true;
+    }
+
     // Password resets & messaging channels
     match /password_resets/{resetId} {
       allow read, write: if true;

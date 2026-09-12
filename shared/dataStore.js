@@ -697,8 +697,91 @@ export function getExamById(id) {
   return exams.find(e => e.id === id) || null;
 }
 
+// Real-time Cloud Firestore subscription for Examinations
+export function subscribeToExams(callback) {
+  if (typeof window === "undefined") return () => {};
+
+  // 1. Immediately emit current local state
+  callback(getExams());
+
+  // 2. Real-time Firestore snapshot listener
+  let unsubscribeFirestore = () => {};
+  try {
+    const colRef = collection(db, "exams");
+    unsubscribeFirestore = onSnapshot(colRef, (snapshot) => {
+      const liveExams = [];
+      snapshot.forEach(docSnap => {
+        liveExams.push({ id: docSnap.id, ...docSnap.data() });
+      });
+
+      const local = getExams();
+      const mergedMap = new Map();
+
+      // Seed with local exams
+      local.forEach(e => mergedMap.set(e.id, e));
+
+      // Overwrite/update with live exams from Firestore
+      liveExams.forEach(e => {
+        mergedMap.set(e.id, {
+          ...(mergedMap.get(e.id) || {}),
+          ...e
+        });
+      });
+
+      // If there are local exams not yet in Firestore, auto-upload them with enriched teacher email
+      local.forEach(async (locE) => {
+        if (!liveExams.some(le => le.id === locE.id)) {
+          try {
+            let examToUpload = { ...locE };
+            if (!examToUpload.assignedTeacherEmail && examToUpload.assignedTeacherName) {
+              const allTeachers = getTeachers();
+              const matchedTch = allTeachers.find(t => 
+                (examToUpload.assignedTeacherId && t.id === examToUpload.assignedTeacherId) ||
+                (t.name && t.name.trim().toLowerCase() === examToUpload.assignedTeacherName.trim().toLowerCase())
+              );
+              if (matchedTch && matchedTch.email) {
+                examToUpload.assignedTeacherEmail = matchedTch.email;
+              }
+            }
+            await setDoc(doc(db, "exams", examToUpload.id), examToUpload, { merge: true });
+          } catch (syncErr) {
+            console.warn("Auto-sync local exam to Firestore notice:", syncErr);
+          }
+        }
+      });
+
+      const merged = Array.from(mergedMap.values());
+      // Sort newest created first
+      merged.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+      localStorage.setItem(STORAGE_KEYS.EXAMS, JSON.stringify(merged));
+      callback(merged);
+      window.dispatchEvent(new CustomEvent("apex_exams_changed", { detail: merged }));
+    }, (err) => {
+      console.warn("Firestore exams subscription notice:", err);
+    });
+  } catch (e) {
+    console.warn("Firestore connection error for exams:", e);
+  }
+
+  // 3. Local custom event listener
+  const handleLocalChange = (e) => {
+    if (e.detail) {
+      callback(e.detail);
+    } else {
+      callback(getExams());
+    }
+  };
+  window.addEventListener("apex_exams_changed", handleLocalChange);
+
+  return () => {
+    unsubscribeFirestore();
+    window.removeEventListener("apex_exams_changed", handleLocalChange);
+  };
+}
+
 // 1. Admin creates scheduled exam (Admin question access is strictly LOCKED until teacher submits)
-export function createExam(examData) {
+export async function createExam(examData) {
   const exams = getExams();
   const newExam = {
     id: `exam_${Date.now()}`,
@@ -712,11 +795,19 @@ export function createExam(examData) {
   };
   exams.unshift(newExam);
   saveExams(exams);
+
+  // Sync to Cloud Firestore
+  try {
+    await setDoc(doc(db, "exams", newExam.id), newExam);
+  } catch (fsErr) {
+    console.warn("Firestore createExam sync notice:", fsErr);
+  }
+
   return newExam;
 }
 
 // 2. Teacher authors questions
-export function updateExamQuestions(examId, questions) {
+export async function updateExamQuestions(examId, questions) {
   const exams = getExams();
   const index = exams.findIndex(e => e.id === examId);
   if (index === -1) return null;
@@ -726,39 +817,70 @@ export function updateExamQuestions(examId, questions) {
   }
 
   exams[index].questions = questions;
+  exams[index].updatedAt = new Date().toISOString();
   saveExams(exams);
+
+  // Sync to Cloud Firestore
+  try {
+    await setDoc(doc(db, "exams", examId), { questions, updatedAt: exams[index].updatedAt }, { merge: true });
+  } catch (fsErr) {
+    console.warn("Firestore updateExamQuestions sync notice:", fsErr);
+  }
+
   return exams[index];
 }
 
 // 3. Teacher Submits Paper to Admin (LOCKS TEACHER, UNLOCKS ADMIN REVIEW)
-export function submitExamPaper(examId) {
+export async function submitExamPaper(examId) {
   const exams = getExams();
   const index = exams.findIndex(e => e.id === examId);
   if (index === -1) return null;
 
+  const submittedAt = new Date().toLocaleString();
   exams[index].status = EXAM_STATUS.PENDING_ADMIN;
-  exams[index].submittedAt = new Date().toLocaleString();
+  exams[index].submittedAt = submittedAt;
   saveExams(exams);
+
+  // Sync to Cloud Firestore
+  try {
+    await setDoc(doc(db, "exams", examId), { status: EXAM_STATUS.PENDING_ADMIN, submittedAt }, { merge: true });
+  } catch (fsErr) {
+    console.warn("Firestore submitExamPaper sync notice:", fsErr);
+  }
+
   return exams[index];
 }
 
 // 4. Admin Approves & Publishes Exam (FINAL LOCK)
-export function approveExam(examId, approvalNote = "") {
+export async function approveExam(examId, approvalNote = "") {
   const exams = getExams();
   const index = exams.findIndex(e => e.id === examId);
   if (index === -1) return null;
 
+  const approvedAt = new Date().toLocaleString();
   exams[index].status = EXAM_STATUS.APPROVED;
-  exams[index].approvedAt = new Date().toLocaleString();
+  exams[index].approvedAt = approvedAt;
   if (approvalNote) {
     exams[index].adminFeedback = approvalNote;
   }
   saveExams(exams);
+
+  // Sync to Cloud Firestore
+  try {
+    await setDoc(doc(db, "exams", examId), { 
+      status: EXAM_STATUS.APPROVED, 
+      approvedAt,
+      adminFeedback: approvalNote || ""
+    }, { merge: true });
+  } catch (fsErr) {
+    console.warn("Firestore approveExam sync notice:", fsErr);
+  }
+
   return exams[index];
 }
 
 // 5. Admin Requests Revision (UNLOCKS TEACHER WITH FEEDBACK)
-export function requestExamRevision(examId, feedbackNote) {
+export async function requestExamRevision(examId, feedbackNote) {
   const exams = getExams();
   const index = exams.findIndex(e => e.id === examId);
   if (index === -1) return null;
@@ -766,5 +888,16 @@ export function requestExamRevision(examId, feedbackNote) {
   exams[index].status = EXAM_STATUS.REVISION;
   exams[index].adminFeedback = feedbackNote;
   saveExams(exams);
+
+  // Sync to Cloud Firestore
+  try {
+    await setDoc(doc(db, "exams", examId), { 
+      status: EXAM_STATUS.REVISION, 
+      adminFeedback: feedbackNote || ""
+    }, { merge: true });
+  } catch (fsErr) {
+    console.warn("Firestore requestExamRevision sync notice:", fsErr);
+  }
+
   return exams[index];
 }
