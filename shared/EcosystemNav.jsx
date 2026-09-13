@@ -46,6 +46,7 @@ import {
   generateGmailComposeUrl
 } from "./emailService.js";
 import { sendFirebaseActivationEmail } from "./firebaseEmailService.js";
+import apexLogo from "./assets/apex_logo.png";
 
 // Universal App URL Resolver: Works seamlessly on both local development and production web URLs
 export function getAppUrl(appId) {
@@ -534,7 +535,7 @@ export default function EcosystemNav({ currentApp = "website" }) {
       <div className="nav-container">
         {/* Brand */}
         <a href={getAppUrl("website")} className="nav-brand">
-          <div className="brand-logo">A</div>
+          <img src={apexLogo} alt="Apex Education Forum" className="brand-logo-img" />
           <div>
             <div className="brand-title">APEX EDUCATION FORUM</div>
             <div className="brand-sub">Unified Ecosystem</div>

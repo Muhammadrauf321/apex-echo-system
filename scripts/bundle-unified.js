@@ -49,4 +49,11 @@ copyDirSync(messagingDist, path.join(targetDir, "connect"));
 console.log("📊 Packaging Management LMS to /lms/ ...");
 copyDirSync(managementDist, path.join(targetDir, "lms"));
 
+// 5. Copy root public folder (e.g. APKs and static assets) to /
+const rootPublic = path.join(rootDir, "public");
+if (fs.existsSync(rootPublic)) {
+  console.log("📱 Packaging shared public assets (APKs) to / ...");
+  copyDirSync(rootPublic, targetDir);
+}
+
 console.log("✅ Unified Bundle Ready in ./dist-unified!");

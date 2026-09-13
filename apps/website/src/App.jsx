@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import EcosystemNav, { getAppUrl } from "@shared/EcosystemNav.jsx";
 import { getCourses, subscribeToCourses, submitInquiry, verifyCertificate, subscribeToCertificates } from "@shared/dataStore.js";
 import ApexCertificate from "@shared/ApexCertificate.jsx";
+import apexLogo from "@shared/assets/apex_logo.png";
 import confetti from "canvas-confetti";
 import { 
   Globe, 
@@ -359,11 +360,11 @@ export default function App() {
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
             <a href="#" className="flex items-center gap-3.5 group">
-              <div className="w-12 h-12 rounded-full brand-gradient p-0.5 shadow-md flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                <div className="w-full h-full bg-white rounded-full flex items-center justify-center border border-white">
-                  <span className="font-extrabold text-cobalt-800 text-base tracking-tighter">AEF</span>
-                </div>
-              </div>
+              <img 
+                src={apexLogo} 
+                alt="Apex Education Forum Logo" 
+                className="w-12 h-12 rounded-full object-contain bg-white shadow-md flex-shrink-0 group-hover:scale-105 transition-transform" 
+              />
               <div>
                 <span className="text-base sm:text-lg font-black tracking-tight text-slate-900 leading-tight block">
                   APEX EDUCATION FORUM
@@ -1275,11 +1276,11 @@ export default function App() {
             
             <div className="lg:col-span-2 space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full brand-gradient p-0.5 flex-shrink-0 flex items-center justify-center">
-                  <div className="w-full h-full bg-white rounded-full flex items-center justify-center">
-                    <span className="font-extrabold text-cobalt-800 text-sm">AEF</span>
-                  </div>
-                </div>
+                <img 
+                  src={apexLogo} 
+                  alt="Apex Education Forum" 
+                  className="w-11 h-11 rounded-full object-contain bg-white shadow-md flex-shrink-0" 
+                />
                 <div>
                   <span className="text-base font-extrabold text-white tracking-tight">Apex Education Forum</span>
                   <p className="text-[10px] text-red-400 font-bold tracking-wider uppercase">MALIR &bull; KARACHI</p>
@@ -1379,7 +1380,7 @@ export default function App() {
             <div className="bg-gradient-to-br from-slate-900 via-cobalt-950 to-slate-900 text-white rounded-2xl p-4 text-left shadow-lg border border-slate-700/80 mb-4 relative overflow-hidden">
               <div className="flex items-center justify-between border-b border-white/10 pb-2 mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-white text-cobalt-900 font-extrabold text-[10px] flex items-center justify-center">AEF</div>
+                  <img src={apexLogo} alt="Apex Logo" className="w-6 h-6 rounded-full object-contain bg-white flex-shrink-0" />
                   <span className="text-[11px] font-bold tracking-tight">Apex Student Identity</span>
                 </div>
                 <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded border border-emerald-400/30">ACTIVE</span>

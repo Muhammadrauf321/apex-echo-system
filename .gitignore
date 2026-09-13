@@ -42,3 +42,15 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Android & Mobile Builds
+.gradle/
+**/android/.gradle/
+**/android/build/
+**/android/app/build/
+**/android/capacitor-cordova-android-plugins/build/
+local.properties
+*.apk
+*.aab
+*.keystore
+*.jks
