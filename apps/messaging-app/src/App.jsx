@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
 import EcosystemNav, { getAppUrl, openApexLoginModal } from "@shared/EcosystemNav.jsx";
-import { getCurrentUser, subscribeToAuth, getRegisteredAccounts, setCurrentUser as setStoredUser } from "@shared/auth.js";
+import { 
+  getCurrentUser, 
+  subscribeToAuth, 
+  getRegisteredAccounts, 
+  setCurrentUser as setStoredUser,
+  loginWithEmail,
+  loginWithAdminGmail,
+  isNativeMobileApp,
+  activateAccountWithPassword
+} from "@shared/auth.js";
 import { getChannelMessages, sendMessage, deleteMessage, clearChannelMessages } from "@shared/dataStore.js";
 import { DEFAULT_CHANNELS, ROLES } from "@shared/constants.js";
 import { 
@@ -383,82 +392,391 @@ export default function App() {
   // Font Size in px based on preference
   const fontSizeStyle = fontSize === "small" ? "13px" : fontSize === "large" ? "16.5px" : "14.5px";
 
-  // Strict Login Barrier
+  // In-App Login State for 100% Native Experience
+  const [inAppEmail, setInAppEmail] = useState("");
+  const [inAppPassword, setInAppPassword] = useState("");
+  const [inAppLoading, setInAppLoading] = useState(false);
+  const [inAppError, setInAppError] = useState("");
+  const [inAppMode, setInAppMode] = useState("login"); // 'login' or 'activate'
+  const [inAppSecurityCode, setInAppSecurityCode] = useState("");
+  const [inAppNewPassword, setInAppNewPassword] = useState("");
+
+  const handleInAppLogin = async (e) => {
+    if (e) e.preventDefault();
+    setInAppError("");
+    setInAppLoading(true);
+    try {
+      const res = await loginWithEmail(inAppEmail, inAppPassword);
+      if (res.success) {
+        setCurrentUser(res.user);
+      } else if (res.requiresActivation) {
+        setInAppMode("activate");
+        setInAppError(res.error || "First login detected! Please enter your temporary code and permanent password.");
+        if (res.invitation?.tempCode) {
+          setInAppSecurityCode(res.invitation.tempCode);
+        }
+      } else {
+        setInAppError(res.error || "Authentication failed. Please check your credentials.");
+      }
+    } catch (err) {
+      setInAppError(err?.message || "Login failed. Please try again.");
+    } finally {
+      setInAppLoading(false);
+    }
+  };
+
+  const handleInAppAdminLogin = async () => {
+    setInAppError("");
+    setInAppLoading(true);
+    try {
+      const res = await loginWithAdminGmail();
+      if (res.success) {
+        setCurrentUser(res.user);
+      }
+    } catch (err) {
+      setInAppError(err?.message || "Failed to sign in as Admin.");
+    } finally {
+      setInAppLoading(false);
+    }
+  };
+
+  const handleInAppActivate = async (e) => {
+    if (e) e.preventDefault();
+    setInAppError("");
+    if (!inAppSecurityCode.trim() || !inAppNewPassword.trim()) {
+      setInAppError("Please enter your temporary security code and new permanent password.");
+      return;
+    }
+    if (inAppNewPassword.length < 6) {
+      setInAppError("Password must be at least 6 characters long.");
+      return;
+    }
+    setInAppLoading(true);
+    try {
+      const res = await activateAccountWithPassword({
+        email: inAppEmail,
+        tempCode: inAppSecurityCode,
+        permanentPassword: inAppNewPassword
+      });
+      if (res.success) {
+        setCurrentUser(res.user);
+      } else {
+        setInAppError(res.error || "Activation failed. Please verify your temporary code.");
+      }
+    } catch (err) {
+      setInAppError(err?.message || "Activation error. Please try again.");
+    } finally {
+      setInAppLoading(false);
+    }
+  };
+
+  // Strict Login Barrier with 100% In-App Mobile Authentication
   if (!currentUser) {
+    const isNative = isNativeMobileApp();
     return (
-      <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "#0b141a", overflow: "hidden" }}>
-        <EcosystemNav currentApp="messaging" />
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+      <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "#0b141a", overflow: "hidden", color: "#e9edef", fontFamily: "Segoe UI, -apple-system, Roboto, sans-serif" }}>
+        {!isNative && (
+          <div style={{ display: isMobile ? "none" : "block" }}>
+            <EcosystemNav currentApp="messaging" />
+          </div>
+        )}
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", overflowY: "auto" }}>
           <div style={{
-            maxWidth: "440px",
+            maxWidth: "420px",
             width: "100%",
-            padding: "36px 28px",
+            padding: isMobile ? "24px 20px" : "32px 28px",
             borderRadius: "18px",
-            textAlign: "center",
             background: "#111b21",
             border: "1px solid rgba(255,255,255,0.08)",
-            boxShadow: "0 20px 50px rgba(0,0,0,0.7)"
+            boxShadow: "0 20px 50px rgba(0,0,0,0.7)",
+            boxSizing: "border-box"
           }}>
             <div style={{
-              width: "68px",
-              height: "68px",
+              width: "60px",
+              height: "60px",
               borderRadius: "50%",
               background: "rgba(0, 168, 132, 0.15)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              margin: "0 auto 16px auto",
+              margin: "0 auto 12px auto",
               color: "#00a884"
             }}>
-              <MessageCircle size={36} />
+              <MessageCircle size={32} />
             </div>
 
-            <h2 style={{ fontSize: "1.45rem", fontWeight: 800, color: "#e9edef", marginBottom: "8px" }}>
+            <h2 style={{ fontSize: "1.35rem", fontWeight: 800, color: "#e9edef", textAlign: "center", marginBottom: "4px" }}>
               Apex Connect
             </h2>
-            <p style={{ fontSize: "0.88rem", color: "#8696a0", lineHeight: 1.6, marginBottom: "26px" }}>
-              Simple, secure batch messaging and interactive practice rooms for Apex students and faculty.
+            <p style={{ fontSize: "0.82rem", color: "#8696a0", textAlign: "center", lineHeight: 1.4, marginBottom: "20px" }}>
+              Official Institutional Messaging & Interactive Classroom Hub
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              <button
-                onClick={() => openApexLoginModal()}
-                className="btn-primary"
-                style={{
-                  width: "100%",
-                  padding: "13px",
-                  fontSize: "0.95rem",
-                  fontWeight: 700,
-                  background: "#00a884",
-                  borderRadius: "24px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px"
-                }}
-              >
-                <ShieldCheck size={18} />
-                <span>Log In with Institutional Account</span>
-              </button>
-              <a
-                href={getAppUrl("website")}
-                className="btn-secondary"
-                style={{
-                  width: "100%",
-                  padding: "11px",
-                  fontSize: "0.88rem",
-                  textDecoration: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "24px",
-                  color: "#8696a0",
-                  borderColor: "rgba(255,255,255,0.1)"
-                }}
-              >
-                Return to Campus Website
-              </a>
+            {/* In-App Security Badge */}
+            <div style={{
+              background: "rgba(0, 168, 132, 0.1)",
+              border: "1px solid rgba(0, 168, 132, 0.25)",
+              borderRadius: "10px",
+              padding: "8px 12px",
+              marginBottom: "16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "0.78rem",
+              color: "#00a884"
+            }}>
+              <ShieldCheck size={16} style={{ flexShrink: 0 }} />
+              <span>100% In-App Secure Sign-In • Stays inside app</span>
             </div>
+
+            {/* Error Message */}
+            {inAppError && (
+              <div style={{
+                background: "rgba(239, 68, 68, 0.15)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                borderRadius: "8px",
+                padding: "9px 12px",
+                marginBottom: "14px",
+                fontSize: "0.8rem",
+                color: "#f87171",
+                lineHeight: 1.4
+              }}>
+                {inAppError}
+              </div>
+            )}
+
+            {/* 1-Tap Quick Admin Gmail Login */}
+            <button
+              type="button"
+              onClick={handleInAppAdminLogin}
+              disabled={inAppLoading}
+              style={{
+                width: "100%",
+                padding: "11px",
+                fontSize: "0.88rem",
+                fontWeight: 700,
+                background: "linear-gradient(135deg, #00a884, #008f6f)",
+                color: "#ffffff",
+                border: "none",
+                borderRadius: "12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                cursor: inAppLoading ? "wait" : "pointer",
+                boxShadow: "0 4px 12px rgba(0, 168, 132, 0.3)",
+                marginBottom: "14px"
+              }}
+            >
+              <ShieldCheck size={17} />
+              <span>{inAppLoading ? "Signing In..." : "1-Tap Sign In with Admin Gmail"}</span>
+            </button>
+
+            <div style={{ display: "flex", alignItems: "center", margin: "14px 0", gap: "10px" }}>
+              <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
+              <span style={{ fontSize: "0.7rem", color: "#8696a0", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.04em" }}>
+                {inAppMode === "login" ? "OR SIGN IN WITH CREDENTIALS" : "ACCOUNT ACTIVATION"}
+              </span>
+              <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.08)" }} />
+            </div>
+
+            {inAppMode === "login" ? (
+              <form onSubmit={handleInAppLogin} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: "#8696a0", marginBottom: "5px" }}>
+                    Gmail or Institutional Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="e.g. muhammadraufbaloch6@gmail.com"
+                    value={inAppEmail}
+                    onChange={(e) => setInAppEmail(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      background: "#202c33",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: "8px",
+                      color: "#e9edef",
+                      fontSize: "0.88rem",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: "#8696a0", marginBottom: "5px" }}>
+                    Password or Temporary Code
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={inAppPassword}
+                    onChange={(e) => setInAppPassword(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      background: "#202c33",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: "8px",
+                      color: "#e9edef",
+                      fontSize: "0.88rem",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={inAppLoading}
+                  style={{
+                    width: "100%",
+                    padding: "11px",
+                    fontSize: "0.9rem",
+                    fontWeight: 700,
+                    background: "rgba(255,255,255,0.08)",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                    color: "#e9edef",
+                    borderRadius: "10px",
+                    cursor: inAppLoading ? "wait" : "pointer",
+                    marginTop: "4px"
+                  }}
+                >
+                  {inAppLoading ? "Verifying..." : "Sign In to Apex Connect"}
+                </button>
+
+                <div style={{ textAlign: "center", marginTop: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInAppMode("activate");
+                      setInAppError("");
+                    }}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "#00a884",
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Have a temporary invitation code? Activate ID
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleInAppActivate} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: "#8696a0", marginBottom: "5px" }}>
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="name@gmail.com"
+                    value={inAppEmail}
+                    onChange={(e) => setInAppEmail(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      background: "#202c33",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: "8px",
+                      color: "#e9edef",
+                      fontSize: "0.88rem",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: "#8696a0", marginBottom: "5px" }}>
+                    Temporary Security Code (e.g. APEX-123456)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="APEX-XXXXXX"
+                    value={inAppSecurityCode}
+                    onChange={(e) => setInAppSecurityCode(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      background: "#202c33",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: "8px",
+                      color: "#e9edef",
+                      fontSize: "0.88rem",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: "#8696a0", marginBottom: "5px" }}>
+                    Set Permanent Password (min. 6 chars)
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={inAppNewPassword}
+                    onChange={(e) => setInAppNewPassword(e.target.value)}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      background: "#202c33",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: "8px",
+                      color: "#e9edef",
+                      fontSize: "0.88rem",
+                      boxSizing: "border-box"
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={inAppLoading}
+                  style={{
+                    width: "100%",
+                    padding: "11px",
+                    fontSize: "0.9rem",
+                    fontWeight: 700,
+                    background: "linear-gradient(135deg, #00a884, #008f6f)",
+                    color: "#ffffff",
+                    border: "none",
+                    borderRadius: "10px",
+                    cursor: inAppLoading ? "wait" : "pointer",
+                    marginTop: "4px"
+                  }}
+                >
+                  {inAppLoading ? "Activating..." : "Activate & Enter Apex Connect"}
+                </button>
+
+                <div style={{ textAlign: "center", marginTop: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInAppMode("login");
+                      setInAppError("");
+                    }}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "#8696a0",
+                      fontSize: "0.78rem",
+                      cursor: "pointer"
+                    }}
+                  >
+                    ← Back to Sign In
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       </div>
@@ -468,8 +786,8 @@ export default function App() {
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", backgroundColor: "#0b141a", color: "#e9edef", overflow: "hidden", fontFamily: "Segoe UI, -apple-system, Roboto, Helvetica, Arial, sans-serif" }}>
       
-      {/* Ecosystem Global Navigation (Hidden on pure mobile WhatsApp layout) */}
-      <div className="whatsapp-top-ecosystem" style={{ display: isMobile && mobileScreen === "conversation" ? "none" : "block" }}>
+      {/* Ecosystem Global Navigation (Hidden on pure mobile WhatsApp layout or Native APK) */}
+      <div className="whatsapp-top-ecosystem" style={{ display: isMobile || isNativeMobileApp() ? "none" : "block" }}>
         <EcosystemNav currentApp="messaging" />
       </div>
 

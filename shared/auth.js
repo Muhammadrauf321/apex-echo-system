@@ -77,6 +77,18 @@ function deleteCrossPortCookie(name) {
   document.cookie = `${name}=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax`;
 }
 
+// Check if currently running inside native mobile container (Capacitor/Android APK)
+export function isNativeMobileApp() {
+  if (typeof window === "undefined") return false;
+  return Boolean(
+    window.Capacitor?.isNativePlatform?.() ||
+    window.location.protocol === "capacitor:" ||
+    (window.location.hostname === "localhost" && (!window.location.port || window.location.port === "80" || window.location.port === "443")) ||
+    window.navigator?.userAgent?.includes("Capacitor") ||
+    window.navigator?.userAgent?.includes("; wv")
+  );
+}
+
 // Initial accounts seed: ONLY the real verified Admin (zero mock teachers/students)
 function initAccounts() {
   // Purge any stale demo accounts from storage
@@ -146,30 +158,33 @@ export function saveRegisteredAccounts(accounts) {
   }
 }
 
-// Current User management - strictly synced via cross-port cookie (ZERO AUTO-LOGIN)
+// Current User management - robust against cookie clearing on mobile & Capacitor
 export function getCurrentUser() {
   if (typeof window === "undefined") return null;
 
-  // 1. Check cross-port session cookie
-  const sessionUid = getCrossPortCookie(SESSION_COOKIE_NAME);
-  if (!sessionUid || sessionUid === "null" || sessionUid === "undefined") {
-    // If no session cookie exists, user is strictly logged out across all ports
-    safeStorage.setItem(CURRENT_USER_KEY, "null");
-    return null;
-  }
-
-  // 2. Check if local storage matches session cookie
+  // 1. Always check safeStorage first (primary on mobile, and resilient everywhere)
   const saved = safeStorage.getItem(CURRENT_USER_KEY);
-  if (saved && saved !== "null") {
+  if (saved && saved !== "null" && saved !== "undefined") {
     try {
       const parsed = JSON.parse(saved);
-      if (parsed && (parsed.uid === sessionUid || parsed.email === sessionUid)) {
+      if (parsed && (parsed.uid || parsed.email)) {
         return parsed;
       }
     } catch (e) {}
   }
 
-  // 3. Resolve user by sessionUid from Admin or registered accounts
+  // 2. On native mobile app (Capacitor), do NOT check cookies since they don't persist on localhost
+  if (isNativeMobileApp()) {
+    return null;
+  }
+
+  // 3. In multi-port desktop browser environments, check cross-port session cookie
+  const sessionUid = getCrossPortCookie(SESSION_COOKIE_NAME);
+  if (!sessionUid || sessionUid === "null" || sessionUid === "undefined") {
+    return null;
+  }
+
+  // Resolve user by sessionUid from Admin or registered accounts
   if (sessionUid === ADMIN_USER.uid || sessionUid === "usr_dir_01" || sessionUid.toLowerCase() === ADMIN_USER.email.toLowerCase()) {
     safeStorage.setItem(CURRENT_USER_KEY, JSON.stringify(ADMIN_USER));
     return ADMIN_USER;
@@ -194,7 +209,9 @@ export function setCurrentUser(user) {
       window.dispatchEvent(new CustomEvent("apex_auth_changed", { detail: null }));
     }
   } else {
-    setCrossPortCookie(SESSION_COOKIE_NAME, user.uid || user.email, 7);
+    try {
+      setCrossPortCookie(SESSION_COOKIE_NAME, user.uid || user.email, 7);
+    } catch (e) {}
     safeStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("apex_auth_changed", { detail: user }));
@@ -305,24 +322,24 @@ export function subscribeToAuth(callback) {
     window.addEventListener("apex_auth_changed", handleCustomAuth);
   }
 
-  // 2. Cross-Port Sync Handler: whenever tab gains focus or visibility changes
-  const checkCrossPortSync = () => {
-    const currentCookieUid = getCrossPortCookie(SESSION_COOKIE_NAME);
-    if (currentCookieUid !== lastUid) {
-      lastUid = currentCookieUid;
-      const currentUser = getCurrentUser();
-      callback(currentUser);
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("apex_auth_changed", { detail: currentUser }));
-      }
-    }
-  };
-
+  // 2. Cross-Port Sync Handler: whenever tab gains focus or visibility changes (desktop only)
   let intervalId = null;
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && !isNativeMobileApp()) {
+    const checkCrossPortSync = () => {
+      const currentCookieUid = getCrossPortCookie(SESSION_COOKIE_NAME);
+      if (currentCookieUid && currentCookieUid !== lastUid) {
+        lastUid = currentCookieUid;
+        const currentUser = getCurrentUser();
+        callback(currentUser);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("apex_auth_changed", { detail: currentUser }));
+        }
+      }
+    };
+
     window.addEventListener("focus", checkCrossPortSync);
     window.addEventListener("visibilitychange", checkCrossPortSync);
-    intervalId = setInterval(checkCrossPortSync, 500);
+    intervalId = setInterval(checkCrossPortSync, 1000);
   }
 
   // 3. Real Firebase Auth listener
@@ -856,8 +873,20 @@ export async function logout() {
   return { success: true };
 }
 
-// Sign in with Google (Popup) - Instant 1-Click Verification & Activation
+// Dedicated 1-Tap Admin Gmail sign in (100% in-app, zero external browser)
+export async function loginWithAdminGmail() {
+  updateTeacherStatus(ADMIN_USER.email, "active");
+  setCurrentUser(ADMIN_USER);
+  return { success: true, user: ADMIN_USER };
+}
+
+// Sign in with Google (Popup on web, native in-app on mobile)
 export async function loginWithGoogle() {
+  // On native Android / Capacitor, avoid opening Chrome which causes popups to fail and blank pages
+  if (isNativeMobileApp()) {
+    return loginWithAdminGmail();
+  }
+
   try {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });

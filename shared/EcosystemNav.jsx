@@ -6,6 +6,8 @@ import {
   logout, 
   loginWithEmail,
   loginWithGoogle,
+  loginWithAdminGmail,
+  isNativeMobileApp,
   getInvitationByToken,
   getInvitationByCodeAndEmail,
   resolveAndActivateInvitationByTokenOrEmail,
@@ -53,7 +55,14 @@ export function getAppUrl(appId) {
   if (typeof window === "undefined") {
     return appId === "website" ? "/" : `/${appId}/`;
   }
-  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  // Native mobile APK (Capacitor): Never link to localhost dev ports!
+  if (isNativeMobileApp()) {
+    if (appId === "website") return "https://apex-education-forum.web.app/";
+    if (appId === "messaging") return "#";
+    if (appId === "management") return "https://apex-education-forum.web.app/lms/";
+    return "https://apex-education-forum.web.app/";
+  }
+  const isLocal = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") && Boolean(window.location.port);
   if (isLocal) {
     if (appId === "website") return "http://localhost:5173";
     if (appId === "messaging") return "http://localhost:5174";
